@@ -21,10 +21,13 @@ public class Notification {
         this.maxTime = durationMs;
         this.startTime = System.currentTimeMillis();
         
-        // Start positions for animations (off-screen bottom right)
-        this.x = 200; // Will be set relative to width in manager
-        this.y = 50;  // Will be set relative to height in manager
+        // Start positions for animations
+        this.x = -1; // Flag as uninitialized
+        this.y = -1;
     }
+
+    public void setX(float x) { this.x = x; }
+    public void setY(float y) { this.y = y; }
 
     public void animate(float targetX, float targetY) {
         this.targetX = targetX;

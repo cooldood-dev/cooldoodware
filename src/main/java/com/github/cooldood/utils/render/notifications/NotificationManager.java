@@ -10,22 +10,24 @@ import org.lwjgl.opengl.GL11;
 
 import java.awt.Color;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 
 public class NotificationManager {
     private static final List<Notification> notifications = new ArrayList<>();
 
-    // Claymorphic Colors
-    private static final Color CLAY_BG = new Color(30, 30, 36, 245);
-    private static final Color CLAY_SHADOW = new Color(0, 0, 0, 80);
-    private static final Color CLAY_HIGHLIGHT = new Color(255, 255, 255, 25);
-    private static final Color TEXT_MUTED = new Color(190, 190, 200);
+    // Modern Dark Theme Constants
+    private static final Color BG_COLOR = new Color(13, 13, 21, 230); // Dark translucent
+    private static final Color TITLE_COLOR = new Color(255, 255, 255);
+    private static final Color DESC_COLOR = new Color(160, 160, 184);
 
-    private static final float PAD = 8;
-    private static final float NOTIF_WIDTH = 140;
-    private static final int TITLE_SIZE = 14;
+    private static final float PAD_X = 7f;
+    private static final float PAD_Y = 6f;
+    private static final int TITLE_SIZE = 12;
     private static final int DESC_SIZE = 10;
+    
+    // Fixed modern dimensions
+    private static final float NOTIF_HEIGHT = 32f;
+    private static final float PROGRESS_HEIGHT = 1.5f;
 
     public static void post(String title, String description, NotificationType type, long durationMs) {
         notifications.add(new Notification(title, description, type, durationMs));
@@ -36,81 +38,76 @@ public class NotificationManager {
 
         ScaledResolution sr = new ScaledResolution(Minecraft.getMinecraft());
         float screenWidth = sr.getScaledWidth();
-        float screenHeight = sr.getScaledHeight();
+        
+        // Target start Y near top right
+        float yOffset = 15;
+        float scale = (float) Notifications.size;
 
-        float yOffset = screenHeight - 20;
+        // Iterate backwards for stacking top-down (newest at top)
+        for (int i = notifications.size() - 1; i >= 0; i--) {
+            Notification notif = notifications.get(i);
 
-        Iterator<Notification> iterator = notifications.iterator();
-        while (iterator.hasNext()) {
-            Notification notif = iterator.next();
+            int effTitleSize = (int)(TITLE_SIZE * scale);
+            int effDescSize = (int)(DESC_SIZE * scale);
+            float effPadX = PAD_X * scale;
+            float effHeight = NOTIF_HEIGHT * scale;
 
-            float effectivePad = PAD * (float)Notifications.size;
-            int effectiveTitleSize = (int)(TITLE_SIZE * Notifications.size);
-            int effectiveDescSize = (int)(DESC_SIZE * Notifications.size);
-            float effectiveWidth = NOTIF_WIDTH * (float)Notifications.size;
-            float notifHeight = effectivePad * 2 + FontUtil.getFontHeight(effectiveTitleSize) + FontUtil.getFontHeight(effectiveDescSize) + 4;
-            
-            yOffset -= notifHeight + 10; // 10 is spacing between notifications
+            // Calculate width dynamically
+            float titleWidth = FontUtil.getStringWidth(notif.getTitle(), effTitleSize);
+            float descWidth = FontUtil.getStringWidth(notif.getDescription(), effDescSize);
+            float effectiveWidth = Math.max(titleWidth, descWidth) + (effPadX * 2);
+            // Minimum width to avoid looking squished
+            if (effectiveWidth < 90 * scale) effectiveWidth = 90 * scale;
 
             float targetX = screenWidth - effectiveWidth - 10;
             float targetY = yOffset;
 
-            if (notif.isExpired()) {
-                targetX = screenWidth + 20; // Slide off screen
-                
-                // Remove once animated off screen
+            // Handle entry/exit
+            if (notif.isExpired() || notif.getTimeLeft() < 300) {
+                targetX = screenWidth + 20; // Slide off right
                 if (notif.getX() >= screenWidth) {
-                    iterator.remove();
-                    continue;
+                    notifications.remove(i);
+                    continue; // Skip rendering
                 }
-            } else if (notif.getTimeLeft() < 300) {
-                 // Fast slide off screen at the very end
-                 targetX = screenWidth + 20;
             }
 
-            // Initialize position if just spawned
-            if (notif.getX() == 200 && notif.getY() == 50) {
-                notif.animate(screenWidth + 20, targetY); 
+            // Initialization (flag is -1, -1)
+            if (notif.getX() == -1 && notif.getY() == -1) {
+                notif.setX(screenWidth + 20); // Start off-screen right
+                notif.setY(targetY);          // At exact Y position
             }
 
             notif.animate(targetX, targetY);
 
-            drawClayNotification(notif.getX(), notif.getY(), effectiveWidth, notifHeight, effectivePad, effectiveTitleSize, effectiveDescSize, notif);
+            drawModernNotification(notif.getX(), notif.getY(), effectiveWidth, effHeight, scale, effTitleSize, effDescSize, effPadX, notif);
+            
+            // Advance Y for next notification
+            yOffset += effHeight + (6 * scale); // Stack gap
         }
     }
 
-    private static void drawClayNotification(float x, float y, float w, float h, float effectivePad, int effectiveTitleSize, int effectiveDescSize, Notification notif) {
+    private static void drawModernNotification(float x, float y, float w, float h, float scale, int effTitleSize, int effDescSize, float effPadX, Notification notif) {
         GL11.glPushMatrix();
 
-        // 1. Drop shadow
-        RenderUtil.drawRoundedRect(x + 2, y + 2, w, h, 8, CLAY_SHADOW);
-        
-        // 2. Base clay body
-        RenderUtil.drawRoundedRect(x, y, w, h, 8, CLAY_BG);
-        
-        // 3. Top rim highlight
-        RenderUtil.drawRoundedRect(x + 1, y + 1, w - 2, 2, 8, CLAY_HIGHLIGHT);
+        float effPadY = PAD_Y * scale;
+        float effProgress = PROGRESS_HEIGHT * scale;
 
-        // 4. Accent Strip (based on type, if INFO use theme color)
-        Color accent = notif.getType() == NotificationType.INFO ? 
-            RenderUtil.getColorsFade(0, ThemeModule.getThemeColours(), 4f) : 
-            notif.getType().getColor();
-            
-        Color accentStrip = new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), 140);
-        RenderUtil.drawRoundedRect(x, y, w, 2, 8, accentStrip);
+        // 1. Minimal Dark Background
+        RenderUtil.drawRoundedRect(x, y, w, h, 2 * scale, BG_COLOR);
 
-        // 5. Progress Bar (bottom)
+        // 2. Text (Title + Description) with drop shadows
+        float textY = y + effPadY;
+        FontUtil.drawString(notif.getTitle(), x + effPadX, textY, effTitleSize, TITLE_COLOR, true);
+        
+        textY += FontUtil.getFontHeight(effTitleSize) + (2 * scale);
+        FontUtil.drawString(notif.getDescription(), x + effPadX, textY, effDescSize, DESC_COLOR, true);
+
+        // 3. Thin Progress Bar (Bottom Edge)
         float progress = Math.max(0, Math.min(1, (float) notif.getTimeLeft() / notif.getMaxTime()));
         if (progress > 0) {
-            Color progColor = new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), 100);
-            RenderUtil.drawRoundedRect(x, y + h - 2, w * progress, 2, 0, progColor); // Optional bottom bar
+            Color accent = RenderUtil.getColorsFade((int)(y * 10), ThemeModule.getThemeColours(), 4f);
+            RenderUtil.drawRoundedRect(x, y + h - effProgress, w * progress, effProgress, 0, accent);
         }
-
-        // 6. Text
-        float cursorY = y + effectivePad;
-        FontUtil.drawString(notif.getTitle(), x + effectivePad, cursorY, effectiveTitleSize, accent, false);
-        cursorY += FontUtil.getFontHeight(effectiveTitleSize) + 4;
-        FontUtil.drawString(notif.getDescription(), x + effectivePad, cursorY, effectiveDescSize, TEXT_MUTED, false);
 
         GL11.glPopMatrix();
     }

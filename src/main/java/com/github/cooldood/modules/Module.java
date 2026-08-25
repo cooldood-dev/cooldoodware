@@ -46,11 +46,11 @@ public abstract class Module {
 
             if (enabled) {
                 com.github.cooldood.utils.client.SoundUtil.playSound("/scalehack/sounds/toggleon.wav");
-                NotificationManager.post("Module Enabled", annotation.name() + " was enabled", NotificationType.SUCCESS, 2000);
+                NotificationManager.post(annotation.name(), "Module enabled", NotificationType.SUCCESS, 3700);
                 onEnable();
             } else {
                 com.github.cooldood.utils.client.SoundUtil.playSound("/scalehack/sounds/toggleoff.wav");
-                NotificationManager.post("Module Disabled", annotation.name() + " was disabled", NotificationType.WARNING, 2000);
+                NotificationManager.post(annotation.name(), "Module disabled", NotificationType.WARNING, 3700);
                 onDisable();
             }
         }
