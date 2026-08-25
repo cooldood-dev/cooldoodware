@@ -76,9 +76,9 @@ public class NotificationManager {
             int effDescSize = (int)(DESC_SIZE * scale);
             float effHeight = NOTIF_HEIGHT * scale;
 
-            // Calculate exact width dynamically
-            float titleWidth = FontUtil.getStringWidth(notif.getTitle(), effTitleSize);
-            float descWidth = FontUtil.getStringWidth(notif.getDescription(), effDescSize);
+            // Calculate exact width dynamically, applying a multiplier to counter FontMetrics underreporting the true visual quad widths
+            float titleWidth = FontUtil.getStringWidth(notif.getTitle(), effTitleSize) * 1.1f + (4f * scale);
+            float descWidth = FontUtil.getStringWidth(notif.getDescription(), effDescSize) * 1.15f + (4f * scale);
             
             float contentWidth = Math.max(titleWidth, descWidth);
             float cardWidth = contentWidth + leftPadding + rightPadding;

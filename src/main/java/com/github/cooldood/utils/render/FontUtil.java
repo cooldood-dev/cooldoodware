@@ -155,7 +155,7 @@ public class FontUtil {
         for (int i = 0; i < string.length(); i++) {
             char c = string.charAt(i);
 
-            if (c == '§') {
+            if (c == '\u00A7') {
                 if (i + 1 >= string.length()) continue;
                 char colourCode = string.charAt(i + 1);
                 if (COLOUR_CODES.indexOf(colourCode) != -1) {
@@ -286,7 +286,7 @@ public class FontUtil {
             char c = string.charAt(i);
 
             CharacterInfo characterRect = charBounds.get(c);
-            if (c == '§')  i++;
+            if (c == '\u00A7')  i++;
             else if (characterRect == null) width += getMinecraftCharWidth(c, generatedSize);
             else width += characterRect.width;
         }
