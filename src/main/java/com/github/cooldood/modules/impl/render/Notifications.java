@@ -15,6 +15,13 @@ import com.github.cooldood.modules.RegisterSubModule;
         category = Category.RENDER
 )
 public class Notifications extends Module {
+    public enum Position {
+        TopRight, TopLeft, BottomRight, BottomLeft
+    }
+
+    @RegisterSubModule(name = "Position")
+    public static Position position = Position.TopRight;
+
     @RegisterSubModule(name = "Size", min = 0.5, max = 2.0, increment = 0.1)
     public static double size = 1.0;
 

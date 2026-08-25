@@ -38,12 +38,16 @@ public class NotificationManager {
 
         ScaledResolution sr = new ScaledResolution(Minecraft.getMinecraft());
         float screenWidth = sr.getScaledWidth();
+        float screenHeight = sr.getScaledHeight();
         
-        // Target start Y near top right
-        float yOffset = 15;
+        Notifications.Position pos = Notifications.position;
+        boolean isTop = (pos == Notifications.Position.TopRight || pos == Notifications.Position.TopLeft);
+        boolean isRight = (pos == Notifications.Position.TopRight || pos == Notifications.Position.BottomRight);
+        
         float scale = (float) Notifications.size;
+        float yOffset = isTop ? 15 : screenHeight - 15;
 
-        // Iterate backwards for stacking top-down (newest at top)
+        // Iterate backwards for stacking top-down or bottom-up (newest at top or bottom)
         for (int i = notifications.size() - 1; i >= 0; i--) {
             Notification notif = notifications.get(i);
 
@@ -59,13 +63,13 @@ public class NotificationManager {
             // Minimum width to avoid looking squished
             if (effectiveWidth < 90 * scale) effectiveWidth = 90 * scale;
 
-            float targetX = screenWidth - effectiveWidth - 10;
-            float targetY = yOffset;
+            float targetX = isRight ? screenWidth - effectiveWidth - 10 : 10;
+            float targetY = isTop ? yOffset : yOffset - effHeight;
 
             // Handle entry/exit
             if (notif.isExpired() || notif.getTimeLeft() < 300) {
-                targetX = screenWidth + 20; // Slide off right
-                if (notif.getX() >= screenWidth) {
+                targetX = isRight ? screenWidth + 20 : -effectiveWidth - 20; // Slide off
+                if (isRight ? notif.getX() >= screenWidth : notif.getX() <= -effectiveWidth) {
                     notifications.remove(i);
                     continue; // Skip rendering
                 }
@@ -73,7 +77,7 @@ public class NotificationManager {
 
             // Initialization (flag is -1, -1)
             if (notif.getX() == -1 && notif.getY() == -1) {
-                notif.setX(screenWidth + 20); // Start off-screen right
+                notif.setX(isRight ? screenWidth + 20 : -effectiveWidth - 20); // Start off-screen
                 notif.setY(targetY);          // At exact Y position
             }
 
@@ -82,7 +86,12 @@ public class NotificationManager {
             drawModernNotification(notif.getX(), notif.getY(), effectiveWidth, effHeight, scale, effTitleSize, effDescSize, effPadX, notif);
             
             // Advance Y for next notification
-            yOffset += effHeight + (6 * scale); // Stack gap
+            float gap = effHeight + (6 * scale);
+            if (isTop) {
+                yOffset += gap; // Stack downwards
+            } else {
+                yOffset -= gap; // Stack upwards
+            }
         }
     }
 
