@@ -65,31 +65,19 @@ public class Statistics extends Module {
     // Separator line between rows
     private static final Color SEPARATOR   = new Color(255, 255, 255, 14);
     // Primary white text
-    private static final Color TEXT_WHITE  = new Color(230, 230, 240, 255);
-    // Muted gray label text
-    private static final Color TEXT_MUTED  = new Color(160, 160, 175, 255);
+    private static final float PANEL_W     = 170f;   // compact width
+    private static final float CORNER_RAD  = 3f;     // flat appearance, slight rounded
+    private static final float PAD_X       = 10f;    // horiz padding
+    private static final float PAD_Y       = 10f;    // vert padding
+    private static final float ROW_H       = 20f;    // compact row height
+    private static final float ICON_SZ     = 12f;    // small icon size
+    private static final float BAR_H       = 2f;     // progress bar height
 
-    // Layout constants — tuned to match reference proportions
-    private static final float PANEL_W     = 210f;   // total panel width
-    private static final float OUTER_RAD   = 14f;    // outer corner radius
-    private static final float INNER_RAD   = 10f;    // inner card corner radius
-    private static final float ICON_RAD    = 8f;     // icon square corner radius
-    private static final float ICON_SZ     = 24f;    // icon square side length
-    private static final float PAD_OUT     = 11f;    // outer container padding
-    private static final float PAD_IN      = 8f;     // inner card padding
-    private static final float ROW_H       = 34f;    // height of each stat row (reduced)
-    private static final float HEADER_H    = 38f;    // header section height (reduced)
-    private static final float PT_ROW_H    = 32f;    // play-time row height (reduced)
-    private static final float BAR_H       = 5f;     // progress bar height
-    private static final float GAP         = 7f;     // gap between sections (reduced)
-
-    // Font sizes — labels & values increased for readability
-    private static final int SZ_TITLE  = 14;   // "SESSION STATS" label
-    private static final int SZ_LABEL  = 12;   // stat row label ("Games Played") — was 10
-    private static final int SZ_VALUE  = 14;   // stat row value ("5") — was 12
-    private static final int SZ_PT_LBL = 11;   // "Play Time" label — was 10
-    private static final int SZ_PT_VAL = 20;   // "05:29" bold value — was 18
-    private static final int SZ_ICON   = 9;    // icon glyph size
+    // Font sizes
+    private static final int SZ_TITLE  = 13;   // "SESSION STATS" label
+    private static final int SZ_LABEL  = 11;   // stat row label
+    private static final int SZ_VALUE  = 11;   // stat row value
+    private static final int SZ_ICON   = 8;    // icon glyph size
 
     private static float width, height;
 
@@ -110,33 +98,18 @@ public class Statistics extends Module {
 
     // ── Accent color from theme ────────────────────────────────────────────
     private static Color accent() {
-        // Use theme primary color but force into purple family if theme is default
         Color[] theme = ThemeModule.getThemeColours();
         return theme[0];
     }
 
-    // ── Icon drawing via small GL rounded-rect dots (font-atlas independent)
-    // Each icon is represented by a small purple rounded square.
-    // Additional geometric details are drawn inside using GL primitives.
-    private static void drawIconSquare(float x, float y) {
-        RenderUtil.drawRoundedRect(x, y, ICON_SZ, ICON_SZ, ICON_RAD, ICON_BG);
-    }
-
-    /**
-     * Draw a simple icon glyph inside the icon square using font chars.
-     * Centered both horizontally and vertically.
-     */
-    private static void drawIconGlyph(float ix, float iy, String glyph, Color color) {
-        float gw = FontUtil.getStringWidth(glyph, SZ_ICON);
-        float gh = FontUtil.getFontHeight(SZ_ICON);
-        float gx = ix + (ICON_SZ - gw) / 2f;
-        float gy = iy + (ICON_SZ - gh) / 2f;
-        FontUtil.drawString(glyph, gx, gy, SZ_ICON, color, false);
+    private static void drawIconSquare(float x, float y, Color ac) {
+        Color bg = new Color(ac.getRed(), ac.getGreen(), ac.getBlue(), 30);
+        RenderUtil.drawRoundedRect(x, y, ICON_SZ, ICON_SZ, 2f, bg);
     }
 
     // ── Draw horizontal separator line ────────────────────────────────────
     private static void drawSep(float x, float y, float w) {
-        RenderUtil.drawRect(x, y, w, 0.7f, SEPARATOR);
+        RenderUtil.drawRect(x, y, w, 1f, new Color(255, 255, 255, 15));
     }
 
     // ── Main render ───────────────────────────────────────────────────────
@@ -147,85 +120,70 @@ public class Statistics extends Module {
         GL11.glScalef(scale, scale, 1f);
 
         Color ac = accent();
-        // Translucent purple for accent text
-        Color accentText = new Color(
-                Math.min(255, (int)(ac.getRed()   * 1.1f)),
-                (int)(ac.getGreen() * 0.7f),
-                Math.min(255, (int)(ac.getBlue()  * 1.1f)),
-                255);
+        Color bg = new Color(22, 22, 26, 220); // Dark translucent charcoal
+        Color textWhite = new Color(240, 240, 240);
+        Color textGray = new Color(170, 170, 170);
 
-        float contentW = PANEL_W - 2 * PAD_OUT;
-
-        // ── Compute heights ───────────────────────────────────────────────
+        // Pre-calculate height dynamically
+        float cursorY = PAD_Y;
+        
+        // Header
+        cursorY += Math.max(ICON_SZ, FontUtil.getFontHeight(SZ_TITLE));
+        cursorY += 6f; // padding below header
+        cursorY += 1f; // accent line
+        cursorY += 6f; // padding above stats
+        
         int statCount = statistics.isEmpty() ? 4 : statistics.size();
-        float statsCardH  = PAD_IN + statCount * ROW_H + PAD_IN;
-        float ptCardH     = PAD_IN + PT_ROW_H + 8 + BAR_H + PAD_IN;
+        cursorY += statCount * ROW_H;
+        
+        // Play time separator
+        cursorY += 6f; 
+        cursorY += 1f; 
+        cursorY += 6f; 
+        
+        // Play time row
+        cursorY += Math.max(ICON_SZ, FontUtil.getFontHeight(SZ_LABEL));
+        cursorY += 6f; 
+        
+        // Progress bar
+        cursorY += BAR_H;
+        cursorY += PAD_Y; 
+        
+        width = PANEL_W;
+        height = cursorY;
 
-        height = PAD_OUT + HEADER_H + GAP + statsCardH + GAP + ptCardH + PAD_OUT;
-        width  = PANEL_W;
+        // Draw background panel (flat appearance, no shadow, tiny radius)
+        RenderUtil.drawRoundedRect(0, 0, width, height, CORNER_RAD, bg);
 
-        // ═══════════════════════════════════════════════════════════════════
-        // 1. OUTER PANEL — dark glass with purple edge border
-        // ═══════════════════════════════════════════════════════════════════
-        // Shadow layer (offset slightly, very transparent)
-        RenderUtil.drawRoundedRect(-3, 3, width + 6, height + 2, OUTER_RAD + 1, new Color(0, 0, 0, 60));
-
-        // Main background
-        RenderUtil.drawRoundedRect(0, 0, width, height, OUTER_RAD, BG_OUTER);
-
-        // Purple edge glow/border
-        RenderUtil.drawRoundedRectOutline(0, 0, width, height, OUTER_RAD, 1.0f,
-                new Color(ac.getRed(), ac.getGreen(), ac.getBlue(), 90));
-
-        // Subtle inner highlight (top-left rim)
-        RenderUtil.drawRoundedRectOutline(1, 1, width - 2, height - 2, OUTER_RAD - 1, 0.6f,
-                new Color(255, 255, 255, 16));
-
-        // ═══════════════════════════════════════════════════════════════════
-        // 2. HEADER
-        // ═══════════════════════════════════════════════════════════════════
-        float hx = PAD_OUT;
-        float hy = PAD_OUT;
-
-        // Icon square (top-left of header)
-        drawIconSquare(hx, hy);
-        // Chart icon — "M" shaped line chart using ASCII that renders reliably
-        FontUtil.drawString("~", hx + (ICON_SZ - FontUtil.getStringWidth("~", SZ_ICON)) / 2f,
-                hy + (ICON_SZ - FontUtil.getFontHeight(SZ_ICON)) / 2f,
-                SZ_ICON, accentText, false);
-
-        // "SESSION" in white, "STATS" in accent purple
-        float titleX = hx + ICON_SZ + 10;
-        float titleY = hy + (ICON_SZ - FontUtil.getFontHeight(SZ_TITLE)) / 2f;
-
-        String sessionStr = "SESSION ";
-        FontUtil.drawString(sessionStr, titleX, titleY, SZ_TITLE, TEXT_WHITE, false);
-        float sessionW = FontUtil.getStringWidth(sessionStr, SZ_TITLE);
-        FontUtil.drawString("STATS", titleX + sessionW, titleY, SZ_TITLE, accentText, false);
-
-        // Status dot — far right of header, vertically centered
-        float dotCX = width - PAD_OUT - 5;
-        float dotCY = hy + ICON_SZ / 2f;
-        RenderUtil.drawRoundedRect(dotCX - 4, dotCY - 4, 8, 8, 4f, accentText);
-
-        // ═══════════════════════════════════════════════════════════════════
-        // 3. STATS CARD
-        // ═══════════════════════════════════════════════════════════════════
-        float cardX = PAD_OUT;
-        float cardY = hy + ICON_SZ + GAP;
-
-        // Inner card background
-        RenderUtil.drawRoundedRect(cardX, cardY, contentW, statsCardH, INNER_RAD, BG_INNER);
-        // Inner card border
-        RenderUtil.drawRoundedRectOutline(cardX, cardY, contentW, statsCardH, INNER_RAD, 0.7f, BORDER_IN);
-
-        // Stat rows
-        // Map icon glyphs: use ASCII that renders in DM Sans Bold
-        String[] rowIcons   = { "G", "V", "+", "K" };
-        String[] rowKeys    = { "Games Played", "Victories", "K/D", "Kills" };
-        boolean[] useAccent = { false, false, true, false };
-
-        float rowY = cardY + PAD_IN;
+        float curY = PAD_Y;
+        
+        // 1. HEADER
+        float headerIconY = curY + (FontUtil.getFontHeight(SZ_TITLE) - ICON_SZ) / 2f;
+        drawIconSquare(PAD_X, headerIconY, ac);
+        // ASCII line chart/grid icon
+        FontUtil.drawString("~", PAD_X + (ICON_SZ - FontUtil.getStringWidth("~", SZ_ICON)) / 2f,
+                headerIconY + (ICON_SZ - FontUtil.getFontHeight(SZ_ICON)) / 2f,
+                SZ_ICON, ac, false);
+                
+        float titleX = PAD_X + ICON_SZ + 6;
+        float titleY = curY + (Math.max(ICON_SZ, FontUtil.getFontHeight(SZ_TITLE)) - FontUtil.getFontHeight(SZ_TITLE)) / 2f;
+        
+        FontUtil.drawString("SESSION ", titleX, titleY, SZ_TITLE, textWhite, false);
+        float sessionW = FontUtil.getStringWidth("SESSION ", SZ_TITLE);
+        FontUtil.drawString("STATS", titleX + sessionW, titleY, SZ_TITLE, ac, false);
+        
+        // Tiny Chevron
+        String chevron = "^";
+        FontUtil.drawString(chevron, width - PAD_X - FontUtil.getStringWidth(chevron, SZ_TITLE), titleY, SZ_TITLE, textGray, false);
+        
+        curY += Math.max(ICON_SZ, FontUtil.getFontHeight(SZ_TITLE)) + 6f;
+        
+        // 2. PURPLE ACCENT LINE
+        RenderUtil.drawRect(0, curY, width, 1f, ac);
+        curY += 1f + 6f;
+        
+        // 3. STATS ROWS
+        String[] rowIcons   = { "v", "v", "v", "x" }; // generic simple icons
         int ri = 0;
         for (Map.Entry<String, Double> entry : statistics.entrySet()) {
             String label = entry.getKey();
@@ -234,116 +192,62 @@ public class Statistics extends Module {
                     ? String.valueOf(entry.getValue().doubleValue())
                     : String.valueOf(entry.getValue().intValue());
 
-            // Row vertical center
-            float rowCY = rowY + ROW_H / 2f;
+            float rowCY = curY + ROW_H / 2f;
             float iconY = rowCY - ICON_SZ / 2f;
-
-            // Icon square
-            float iconX = cardX + PAD_IN;
-            drawIconSquare(iconX, iconY);
-            // Icon glyph
+            
+            drawIconSquare(PAD_X, iconY, ac);
             String glyph = ri < rowIcons.length ? rowIcons[ri] : "?";
             FontUtil.drawString(glyph,
-                    iconX + (ICON_SZ - FontUtil.getStringWidth(glyph, SZ_ICON)) / 2f,
+                    PAD_X + (ICON_SZ - FontUtil.getStringWidth(glyph, SZ_ICON)) / 2f,
                     iconY + (ICON_SZ - FontUtil.getFontHeight(SZ_ICON)) / 2f,
-                    SZ_ICON, accentText, false);
-
-            // Label (muted gray)
-            float labelX = iconX + ICON_SZ + 10;
+                    SZ_ICON, ac, false);
+                    
             float labelY = rowCY - FontUtil.getFontHeight(SZ_LABEL) / 2f;
-            FontUtil.drawString(label, labelX, labelY, SZ_LABEL, TEXT_MUTED, false);
-
-            // Value (right-aligned, accent if KD else white)
-            Color valColor = isKD ? accentText : TEXT_WHITE;
+            FontUtil.drawString(label, PAD_X + ICON_SZ + 6, labelY, SZ_LABEL, textGray, false);
+            
+            Color valColor = isKD ? ac : textWhite;
             float valW = FontUtil.getStringWidth(value, SZ_VALUE);
-            float valX = cardX + contentW - PAD_IN - valW;
-            float valY = rowCY - FontUtil.getFontHeight(SZ_VALUE) / 2f;
-            FontUtil.drawString(value, valX, valY, SZ_VALUE, valColor, false);
-
-            rowY += ROW_H;
-
-            // Separator (not after last row)
-            if (ri < statCount - 1) {
-                float sepX = cardX + PAD_IN;
-                float sepW = contentW - 2 * PAD_IN;
-                drawSep(sepX, rowY - 0.5f, sepW);
-            }
-
+            FontUtil.drawString(value, width - PAD_X - valW, labelY, SZ_VALUE, valColor, false);
+            
+            curY += ROW_H;
             ri++;
         }
-
-        // ═══════════════════════════════════════════════════════════════════
-        // 4. PLAY TIME CARD
-        // ═══════════════════════════════════════════════════════════════════
-        float ptCardY = cardY + statsCardH + GAP;
-
-        // Card background + border
-        RenderUtil.drawRoundedRect(cardX, ptCardY, contentW, ptCardH, INNER_RAD, BG_INNER);
-        RenderUtil.drawRoundedRectOutline(cardX, ptCardY, contentW, ptCardH, INNER_RAD, 0.7f, BORDER_IN);
-
-        // Row: icon + "Play Time" label + "MM:SS" value
-        float ptRowCY = ptCardY + PAD_IN + PT_ROW_H / 2f;
-        float ptIconY = ptRowCY - ICON_SZ / 2f;
-
-        // Clock icon square
-        drawIconSquare(cardX + PAD_IN, ptIconY);
+        
+        // 4. PLAY TIME SEPARATOR
+        curY += 6f;
+        drawSep(PAD_X, curY, width - 2*PAD_X);
+        curY += 1f + 6f;
+        
+        // 5. PLAY TIME
+        float ptCY = curY + FontUtil.getFontHeight(SZ_LABEL) / 2f;
+        float ptIconY = ptCY - ICON_SZ / 2f;
+        
+        // Clock icon (O)
+        drawIconSquare(PAD_X, ptIconY, textGray); // keep it subtle
         FontUtil.drawString("O",
-                cardX + PAD_IN + (ICON_SZ - FontUtil.getStringWidth("O", SZ_ICON)) / 2f,
+                PAD_X + (ICON_SZ - FontUtil.getStringWidth("O", SZ_ICON)) / 2f,
                 ptIconY + (ICON_SZ - FontUtil.getFontHeight(SZ_ICON)) / 2f,
-                SZ_ICON, accentText, false);
-
-        // "Play Time" label
-        float ptLabelX = cardX + PAD_IN + ICON_SZ + 10;
-        float ptLabelY = ptRowCY - FontUtil.getFontHeight(SZ_PT_LBL) / 2f;
-        FontUtil.drawString("Play Time", ptLabelX, ptLabelY, SZ_PT_LBL, TEXT_MUTED, false);
-
-        // Play time value — large, right-aligned, accent purple
+                SZ_ICON, textGray, false);
+                
+        float ptLabelY = ptCY - FontUtil.getFontHeight(SZ_LABEL) / 2f;
+        FontUtil.drawString("Play Time", PAD_X + ICON_SZ + 6, ptLabelY, SZ_LABEL, textGray, false);
+        
         int[] playTime = getPlayTime();
-        String playTimeStr = formatPlayTime(playTime);
-        float ptValW = FontUtil.getStringWidth(playTimeStr, SZ_PT_VAL);
-        float ptValX = cardX + contentW - PAD_IN - ptValW;
-        float ptValY = ptRowCY - FontUtil.getFontHeight(SZ_PT_VAL) / 2f;
-        FontUtil.drawString(playTimeStr, ptValX, ptValY, SZ_PT_VAL, accentText, false);
+        String timeStr = formatPlayTime(playTime);
+        float timeW = FontUtil.getStringWidth(timeStr, SZ_VALUE);
+        FontUtil.drawString(timeStr, width - PAD_X - timeW, ptLabelY, SZ_VALUE, ac, false);
+        
+        curY += FontUtil.getFontHeight(SZ_LABEL) + 6f;
+        
+        // 6. PROGRESS BAR
+        float barW = width - 2*PAD_X;
+        // Dark track
+        RenderUtil.drawRect(PAD_X, curY, barW, BAR_H, new Color(12, 12, 16)); 
+        // Purple fill based on seconds progress
+        float progress = (playTime[2] % 60) / 60f; 
+        RenderUtil.drawRect(PAD_X, curY, barW * progress, BAR_H, ac);
 
-        // ── Progress Bar ─────────────────────────────────────────────────
-        float barY   = ptCardY + PAD_IN + PT_ROW_H + 4;
-        float barX   = cardX + PAD_IN;
-        float barW   = contentW - 2 * PAD_IN;
-
-        // Track
-        RenderUtil.drawRoundedRect(barX, barY, barW, BAR_H, BAR_H / 2f, new Color(15, 15, 20, 200));
-
-        // Fill with accent gradient — capped at 1 hour = 60 min
-        float pct = Math.min((playTime[1] + playTime[2] / 60f) / 60f, 1f);
-        if (pct > 0.01f) {
-            Color[] grad = RenderUtil.getColorsFade(0, barW, ThemeModule.getThemeColours(), 4f);
-            RenderUtil.drawGradientLR(barX, barY, barW * pct, BAR_H, grad[0], grad[1]);
-            // Glow effect: slightly wider, very transparent
-            RenderUtil.drawRoundedRect(barX, barY - 1, barW * pct, BAR_H + 2, BAR_H / 2f,
-                    new Color(ac.getRed(), ac.getGreen(), ac.getBlue(), 35));
-        }
-
-        // ── Speed Graph (integrated, if enabled) ─────────────────────────
-        if (motionGraph && !seprateMotionGraph) {
-            float graphCardY = ptCardY + ptCardH + GAP;
-            float graphInnerH = FontUtil.getFontHeight(SZ_LABEL) + 8 + 40;
-            float graphCardH  = PAD_IN * 2 + graphInnerH;
-
-            // Extend rendered height
-            height = graphCardY + graphCardH + PAD_OUT;
-
-            RenderUtil.drawRoundedRect(cardX, graphCardY, contentW, graphCardH, INNER_RAD, BG_INNER);
-            RenderUtil.drawRoundedRectOutline(cardX, graphCardY, contentW, graphCardH, INNER_RAD, 0.7f, BORDER_IN);
-
-            float gCursor = graphCardY + PAD_IN;
-            FontUtil.drawString("Speed (BPS)", cardX + PAD_IN, gCursor, SZ_LABEL, TEXT_MUTED, false);
-            String avgText = getAverageSpeed() + " avg";
-            FontUtil.drawString(avgText,
-                    cardX + contentW - PAD_IN - FontUtil.getStringWidth(avgText, SZ_LABEL),
-                    gCursor, SZ_LABEL, accentText, false);
-            gCursor += FontUtil.getFontHeight(SZ_LABEL) + 8;
-            drawSpeedPlot(cardX + PAD_IN, gCursor, contentW - 2 * PAD_IN, 40, ac);
-        }
+        // Note: motion graph is handled separately now
 
         GL11.glPopMatrix();
         return new double[]{width * scale, height * scale};
@@ -355,30 +259,30 @@ public class Statistics extends Module {
         GL11.glScalef(scale, scale, 1f);
 
         Color ac = accent();
-        float contentW = PANEL_W - 2 * PAD_OUT;
+        Color bg = new Color(22, 22, 26, 220); // Dark translucent charcoal
+        Color textWhite = new Color(240, 240, 240);
+        Color textGray = new Color(170, 170, 170);
+        Color separatorColor = new Color(255, 255, 255, 15);
+
         float innerH   = FontUtil.getFontHeight(SZ_LABEL) + 8 + 50;
-        float graphCardH = PAD_IN * 2 + innerH;
-        float panelH     = PAD_OUT * 2 + graphCardH;
+        float graphCardH = PAD_Y * 2 + innerH;
+        float panelH     = graphCardH;
 
         width  = PANEL_W;
         height = panelH;
 
-        RenderUtil.drawRoundedRect(0, 0, width, height, OUTER_RAD, BG_OUTER);
-        RenderUtil.drawRoundedRectOutline(0, 0, width, height, OUTER_RAD, 1f,
-                new Color(ac.getRed(), ac.getGreen(), ac.getBlue(), 90));
+        RenderUtil.drawRoundedRect(0, 0, width, height, CORNER_RAD, bg);
+        // Extremely subtle inner border
+        RenderUtil.drawRoundedRectOutline(0, 0, width, height, CORNER_RAD, 0.5f, new Color(255, 255, 255, 10));
 
-        float cardX = PAD_OUT, cardY = PAD_OUT;
-        RenderUtil.drawRoundedRect(cardX, cardY, contentW, graphCardH, INNER_RAD, BG_INNER);
-        RenderUtil.drawRoundedRectOutline(cardX, cardY, contentW, graphCardH, INNER_RAD, 0.7f, BORDER_IN);
-
-        float cursor = cardY + PAD_IN;
-        FontUtil.drawString("Movement Speed", cardX + PAD_IN, cursor, SZ_LABEL, TEXT_MUTED, false);
+        float cursor = PAD_Y;
+        FontUtil.drawString("Movement Speed", PAD_X, cursor, SZ_LABEL, textGray, false);
         String avgText = getAverageSpeed() + " bps avg";
         FontUtil.drawString(avgText,
-                cardX + contentW - PAD_IN - FontUtil.getStringWidth(avgText, SZ_LABEL),
+                width - PAD_X - FontUtil.getStringWidth(avgText, SZ_LABEL),
                 cursor, SZ_LABEL, ac, false);
         cursor += FontUtil.getFontHeight(SZ_LABEL) + 8;
-        drawSpeedPlot(cardX + PAD_IN, cursor, contentW - 2 * PAD_IN, 50, ac);
+        drawSpeedPlot(PAD_X, cursor, width - 2 * PAD_X, 50, ac);
 
         GL11.glPopMatrix();
         return new double[]{width * scale, height * scale};
