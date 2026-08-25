@@ -64,29 +64,42 @@ public class NotificationManager {
 
         float yOffset = isTop ? 15 : screenHeight - 15;
 
-        // Iterate backwards for stacking top-down or bottom-up (newest at top or bottom)
+        // Padding requirements
+        float leftPadding = 12f * scale;
+        float rightPadding = 12f * scale;
+
+        // Iterate backwards for stacking top-down or bottom-up
         for (int i = notifications.size() - 1; i >= 0; i--) {
             Notification notif = notifications.get(i);
 
             int effTitleSize = (int)(TITLE_SIZE * scale);
             int effDescSize = (int)(DESC_SIZE * scale);
-            float effPadX = PAD_X * scale;
             float effHeight = NOTIF_HEIGHT * scale;
 
-            // Calculate width dynamically
+            // Calculate exact width dynamically
             float titleWidth = FontUtil.getStringWidth(notif.getTitle(), effTitleSize);
             float descWidth = FontUtil.getStringWidth(notif.getDescription(), effDescSize);
-            float effectiveWidth = Math.max(titleWidth, descWidth) + (effPadX * 2);
-            // Minimum width to avoid looking squished
-            if (effectiveWidth < 90 * scale) effectiveWidth = 90 * scale;
+            
+            float contentWidth = Math.max(titleWidth, descWidth);
+            float cardWidth = contentWidth + leftPadding + rightPadding;
 
-            float targetX = isRight ? screenWidth - effectiveWidth - 10 : 10;
+            // Minimum width to avoid looking squished
+            cardWidth = Math.max(cardWidth, 90f * scale);
+
+            // Screen edge safety
+            float leftSafetyMargin = 10f;
+            float rightMargin = 10f;
+            float maxAllowedWidth = screenWidth - rightMargin - leftSafetyMargin;
+            
+            cardWidth = Math.min(cardWidth, maxAllowedWidth);
+
+            float targetX = isRight ? screenWidth - cardWidth - rightMargin : leftSafetyMargin;
             float targetY = isTop ? yOffset : yOffset - effHeight;
 
             // Handle entry/exit
             if (notif.isExpired() || notif.getTimeLeft() < 300) {
-                targetX = isRight ? screenWidth + 20 : -effectiveWidth - 20; // Slide off
-                if (isRight ? notif.getX() >= screenWidth : notif.getX() <= -effectiveWidth) {
+                targetX = isRight ? screenWidth + 20 : -cardWidth - 20; // Slide off
+                if (isRight ? notif.getX() >= screenWidth : notif.getX() <= -cardWidth) {
                     notifications.remove(i);
                     continue; // Skip rendering
                 }
@@ -94,13 +107,13 @@ public class NotificationManager {
 
             // Initialization (flag is -1, -1)
             if (notif.getX() == -1 && notif.getY() == -1) {
-                notif.setX(isRight ? screenWidth + 20 : -effectiveWidth - 20); // Start off-screen
+                notif.setX(isRight ? screenWidth + 20 : -cardWidth - 20); // Start off-screen
                 notif.setY(targetY);          // At exact Y position
             }
 
             notif.animate(targetX, targetY);
 
-            drawModernNotification(notif.getX(), notif.getY(), effectiveWidth, effHeight, scale, effTitleSize, effDescSize, effPadX, notif);
+            drawModernNotification(notif.getX(), notif.getY(), cardWidth, effHeight, scale, effTitleSize, effDescSize, leftPadding, rightPadding, notif);
             
             // Advance Y for next notification
             float gap = effHeight + (6 * scale);
@@ -120,7 +133,21 @@ public class NotificationManager {
         GlStateManager.popMatrix();
     }
 
-    private static void drawModernNotification(float x, float y, float w, float h, float scale, int effTitleSize, int effDescSize, float effPadX, Notification notif) {
+    private static String truncateTextIfNeeded(String text, int size, float maxWidth) {
+        if (FontUtil.getStringWidth(text, size) <= maxWidth) return text;
+        String ellipsis = "...";
+        float ellipsisWidth = FontUtil.getStringWidth(ellipsis, size);
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < text.length(); i++) {
+            if (FontUtil.getStringWidth(sb.toString() + text.charAt(i), size) + ellipsisWidth > maxWidth) {
+                break;
+            }
+            sb.append(text.charAt(i));
+        }
+        return sb.toString() + ellipsis;
+    }
+
+    private static void drawModernNotification(float x, float y, float w, float h, float scale, int effTitleSize, int effDescSize, float leftPadding, float rightPadding, Notification notif) {
         GL11.glPushMatrix();
 
         float effPadY = PAD_Y * scale;
@@ -129,18 +156,29 @@ public class NotificationManager {
         // 1. Minimal Dark Background
         RenderUtil.drawRoundedRect(x, y, w, h, 2 * scale, BG_COLOR);
 
+        // Calculate available text width
+        float availableTextWidth = w - leftPadding - rightPadding;
+        
+        String safeTitle = truncateTextIfNeeded(notif.getTitle(), effTitleSize, availableTextWidth);
+        String safeDesc = truncateTextIfNeeded(notif.getDescription(), effDescSize, availableTextWidth);
+
         // 2. Text (Title + Description) with drop shadows
         float textY = y + effPadY;
-        FontUtil.drawString(notif.getTitle(), x + effPadX, textY, effTitleSize, TITLE_COLOR, true);
+        FontUtil.drawString(safeTitle, x + leftPadding, textY, effTitleSize, TITLE_COLOR, true);
         
         textY += FontUtil.getFontHeight(effTitleSize) + (2 * scale);
-        FontUtil.drawString(notif.getDescription(), x + effPadX, textY, effDescSize, DESC_COLOR, true);
+        FontUtil.drawString(safeDesc, x + leftPadding, textY, effDescSize, DESC_COLOR, true);
 
         // 3. Thin Progress Bar (Bottom Edge)
         float progress = Math.max(0, Math.min(1, (float) notif.getTimeLeft() / notif.getMaxTime()));
         if (progress > 0) {
             Color accent = RenderUtil.getColorsFade((int)(y * 10), ThemeModule.getThemeColours(), 4f);
-            RenderUtil.drawRoundedRect(x, y + h - effProgress, w * progress, effProgress, 0, accent);
+            
+            // Progress bar stays completely inside the notification
+            float barWidth = w - leftPadding - rightPadding;
+            float barX = x + leftPadding;
+            
+            RenderUtil.drawRoundedRect(barX, y + h - effProgress, barWidth * progress, effProgress, 0, accent);
         }
 
         GL11.glPopMatrix();
