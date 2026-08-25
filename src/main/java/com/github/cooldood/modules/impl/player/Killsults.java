@@ -16,7 +16,22 @@ import net.minecraft.util.EnumChatFormatting;
 )
 public class Killsults extends Module {
 
-    private static final String MESSAGE = "Subscribe to @cooldood67420 on yt for more coolware updates";
+    private static final String[] MESSAGES = {
+        "Subscribe to @cooldood67420 on yt for more coolware updates",
+        "Sorry babe, that skill could work against ambient or astralis not coolware",
+        "coolware mogs all",
+        "If a vibecode can screw u up, who are you?",
+        "Screwed by cooldood",
+        "Get coolware @ cooldood.lol",
+        "Gemini and Claude VS watchdog",
+        "Million dollar anticheat VS Indian tard",
+        "YVL by coolware",
+        "Greetings from Folk Valley",
+        "This one sponsored by the Communist Hacks Party",
+        "Hello Micheal Stetson"
+    };
+
+    private static int currentIndex = 0;
 
     @SubscribeEvent
     public static void onChat(PacketEvent.Receive event) {
@@ -34,9 +49,9 @@ public class Killsults extends Module {
         String myName = C.p().getName();
         
         if (message.contains("by " + myName) || message.contains("to " + myName)) {
-            // Very simple check to ensure it's a kill message. 
-            // In a real client, you'd want a more robust regex list like AutoGG uses.
-            C.p().sendChatMessage(MESSAGE);
+            // Send message and increment index
+            C.p().sendChatMessage(MESSAGES[currentIndex]);
+            currentIndex = (currentIndex + 1) % MESSAGES.length;
         }
     }
 
