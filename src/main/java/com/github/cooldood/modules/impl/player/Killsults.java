@@ -2,6 +2,7 @@ package com.github.cooldood.modules.impl.player;
 
 import com.github.cooldood.events.SubscribeEvent;
 import com.github.cooldood.events.impl.PacketEvent;
+import com.github.cooldood.events.impl.WorldUnloadEvent;
 import com.github.cooldood.modules.Category;
 import com.github.cooldood.modules.Module;
 import com.github.cooldood.modules.RegisterModule;
@@ -22,9 +23,9 @@ public class Killsults extends Module {
         "coolware mogs all",
         "If a vibecode can screw u up, who are you?",
         "Screwed by cooldood",
-        "Get coolware @ cooldood.lol",
+        "Developer = cooldood",
         "Gemini and Claude VS watchdog",
-        "Million dollar anticheat VS Indian tard",
+        "million dollar anticheat vs indian kid",
         "YVL by coolware",
         "Greetings from Folk Valley",
         "This one sponsored by the Communist Hacks Party",
@@ -34,11 +35,22 @@ public class Killsults extends Module {
     private static int currentIndex = 0;
 
     @SubscribeEvent
+    public static void onWorldUnload(WorldUnloadEvent event) {
+        currentIndex = 0;
+    }
+
+    @SubscribeEvent
     public static void onChat(PacketEvent.Receive event) {
         if (!(event.packet instanceof S02PacketChat)) return;
 
         S02PacketChat packet = (S02PacketChat) event.packet;
         String message = EnumChatFormatting.getTextWithoutFormattingCodes(packet.getChatComponent().getUnformattedText());
+        String messageStr = packet.getChatComponent().toString();
+
+        // Reset per game on Hypixel
+        if (messageStr.contains("ClickEvent{action=RUN_COMMAND, value='/play ") || messageStr.contains("Want to play again?")) {
+            currentIndex = 0;
+        }
 
         // Basic Hypixel kill messages regex check
         // Examples: 
