@@ -6,6 +6,7 @@ import com.github.cooldood.utils.render.FontUtil;
 import com.github.cooldood.utils.render.RenderUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ScaledResolution;
+import net.minecraft.client.renderer.GlStateManager;
 import org.lwjgl.opengl.GL11;
 
 import java.awt.Color;
@@ -36,15 +37,31 @@ public class NotificationManager {
     public static void render() {
         if (notifications.isEmpty()) return;
 
-        ScaledResolution sr = new ScaledResolution(Minecraft.getMinecraft());
+        Minecraft mc = Minecraft.getMinecraft();
+        ScaledResolution sr = new ScaledResolution(mc);
         float screenWidth = sr.getScaledWidth();
         float screenHeight = sr.getScaledHeight();
-        
-        Notifications.Position pos = Notifications.position;
-        boolean isTop = (pos == Notifications.Position.TopRight || pos == Notifications.Position.TopLeft);
-        boolean isRight = (pos == Notifications.Position.TopRight || pos == Notifications.Position.BottomRight);
-        
+
+        // 1. Enforce the correct GUI Projection Matrix in case RenderTickEvent is using a different state
+        GlStateManager.matrixMode(GL11.GL_PROJECTION);
+        GlStateManager.pushMatrix();
+        GlStateManager.loadIdentity();
+        GL11.glOrtho(0.0D, sr.getScaledWidth_double(), sr.getScaledHeight_double(), 0.0D, 1000.0D, 3000.0D);
+
+        GlStateManager.matrixMode(GL11.GL_MODELVIEW);
+        GlStateManager.pushMatrix();
+        GlStateManager.loadIdentity();
+        GlStateManager.translate(0.0F, 0.0F, -2000.0F);
+
+        // 2. Disable Scissor Test if another module left it enabled
+        boolean wasScissor = GL11.glIsEnabled(GL11.GL_SCISSOR_TEST);
+        if (wasScissor) GL11.glDisable(GL11.GL_SCISSOR_TEST);
+
         float scale = (float) Notifications.size;
+        Notifications.Position pos = Notifications.position;
+        boolean isRight = (pos == Notifications.Position.TopRight || pos == Notifications.Position.BottomRight);
+        boolean isTop = (pos == Notifications.Position.TopRight || pos == Notifications.Position.TopLeft);
+
         float yOffset = isTop ? 15 : screenHeight - 15;
 
         // Iterate backwards for stacking top-down or bottom-up (newest at top or bottom)
@@ -93,6 +110,14 @@ public class NotificationManager {
                 yOffset -= gap; // Stack upwards
             }
         }
+
+        // Restore OpenGL state
+        if (wasScissor) GL11.glEnable(GL11.GL_SCISSOR_TEST);
+
+        GlStateManager.matrixMode(GL11.GL_PROJECTION);
+        GlStateManager.popMatrix();
+        GlStateManager.matrixMode(GL11.GL_MODELVIEW);
+        GlStateManager.popMatrix();
     }
 
     private static void drawModernNotification(float x, float y, float w, float h, float scale, int effTitleSize, int effDescSize, float effPadX, Notification notif) {
