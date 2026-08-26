@@ -53,6 +53,14 @@ public class TargetHUD extends Module {
 
     private static Target target;
 
+    // ── Fight Status Tracking ─────────────────────────────────────────────────
+    private static float trackedPlayerHealth = -1f;
+    private static float trackedTargetHealth = -1f;
+    private static float playerHealthDelta   = 0f;
+    private static float targetHealthDelta   = 0f;
+    private static long  lastHealthSnapshot  = 0L;
+    private static final long SNAPSHOT_INTERVAL = 1500L;
+
     @AllArgsConstructor
     private static class Target {
         public EntityLivingBase entity;
@@ -116,12 +124,49 @@ public class TargetHUD extends Module {
                 String distStr     = String.valueOf(distNumber);
                 String infoPrefix  = healthStr + "  -  " + distStr + " ";
 
+                // ── Fight Status (winning / losing) ───────────────────────────
+                float playerHealth = C.p() != null ? C.p().getHealth() : -1f;
+                long  now          = System.currentTimeMillis();
+                if (lastHealthSnapshot == 0L) {
+                    // Initialise baseline
+                    trackedPlayerHealth = playerHealth;
+                    trackedTargetHealth = healthRaw;
+                    lastHealthSnapshot  = now;
+                } else if (now - lastHealthSnapshot >= SNAPSHOT_INTERVAL) {
+                    playerHealthDelta   = playerHealth - trackedPlayerHealth;
+                    targetHealthDelta   = healthRaw    - trackedTargetHealth;
+                    trackedPlayerHealth = playerHealth;
+                    trackedTargetHealth = healthRaw;
+                    lastHealthSnapshot  = now;
+                }
+
+                // Determine label: player gaining more relative health (or target losing more) → WINNING
+                String statusLabel;
+                Color  statusColorRGB; // alpha applied later, once aInt is known
+                float  THRESHOLD = 0.5f; // hp change needed to flip status
+                if (playerHealth <= 0f || trackedPlayerHealth < 0f) {
+                    statusLabel    = "";
+                    statusColorRGB = new Color(0, 0, 0, 0);
+                } else if (targetHealthDelta < -THRESHOLD && playerHealthDelta >= targetHealthDelta) {
+                    statusLabel    = "WINNING";
+                    statusColorRGB = new Color(80, 210, 120);
+                } else if (playerHealthDelta < -THRESHOLD && playerHealthDelta < targetHealthDelta) {
+                    statusLabel    = "LOSING";
+                    statusColorRGB = new Color(220, 70, 70);
+                } else {
+                    statusLabel    = "EVEN";
+                    statusColorRGB = new Color(160, 160, 175);
+                }
+
                 // ── Panel sizing ──────────────────────────────────────────────
                 float nameW     = FontUtil.getStringWidth(name, NAME_SIZE);
                 float infoTextW = FontUtil.getStringWidth(infoPrefix, INFO_SIZE);
                 float heartW    = IconFont.getWidth(IconFont.HEART, INFO_SIZE);
                 float infoW     = infoTextW + heartW;
-                float textColW  = Math.max(nameW, infoW);
+                float statusW   = statusLabel.isEmpty() ? 0f : FontUtil.getStringWidth(statusLabel, INFO_SIZE) + 4f;
+                // name row must fit: name on left, status label on right
+                float nameRowW  = nameW + (statusLabel.isEmpty() ? 0f : 8f + statusW);
+                float textColW  = Math.max(nameRowW, infoW);
                 float panelW    = Math.max(PAD + HEAD_SIZE + INNER_PAD + textColW + PAD, 130f);
 
                 float nameH     = FontUtil.getFontHeight(NAME_SIZE);
@@ -173,6 +218,16 @@ public class TargetHUD extends Module {
                 // Player name — near-white
                 FontUtil.drawString(name, colX, blockTopY, NAME_SIZE,
                         new Color(230, 230, 235, aInt), true);
+
+                // Fight status label — right-aligned in the name row
+                if (!statusLabel.isEmpty()) {
+                    float labelW  = FontUtil.getStringWidth(statusLabel, INFO_SIZE);
+                    float labelX  = x + panelW - PAD - labelW;
+                    float labelY  = blockTopY + (nameH - FontUtil.getFontHeight(INFO_SIZE)) / 2f;
+                    Color labelC  = new Color(statusColorRGB.getRed(), statusColorRGB.getGreen(),
+                                             statusColorRGB.getBlue(), aInt);
+                    FontUtil.drawString(statusLabel, labelX, labelY, INFO_SIZE, labelC, true);
+                }
 
                 // ── Health bar ────────────────────────────────────────────────
                 float barY = blockTopY + nameH + 2f;
@@ -227,6 +282,12 @@ public class TargetHUD extends Module {
         }
 
         target = new Target(entity, System.currentTimeMillis());
+        // Reset fight-status tracking for the new target
+        trackedPlayerHealth = -1f;
+        trackedTargetHealth = -1f;
+        playerHealthDelta   = 0f;
+        targetHealthDelta   = 0f;
+        lastHealthSnapshot  = 0L;
     }
 
     @Override
