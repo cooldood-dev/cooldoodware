@@ -17,18 +17,14 @@ import net.minecraft.util.Vec3;
 
 public class PlayerUtil {
     public static boolean canAttack() {
+        if (com.github.cooldood.modules.impl.combat.Watchdog.isModuleBlocking()) return false;
         return !KillAura.isBlockingSwing() || KillAura.canSwingWhileBlocking();
     }
 
     public static boolean attack(Entity target) {
-        if (canAttack()) {
-            swingHand();
-            C.mc.playerController.attackEntity(C.p(), target);
-
-            return true;
-        }
-
-        return false;
+        swingHand();
+        C.mc.playerController.attackEntity(C.p(), target);
+        return true;
     }
 
     private static int lastSwing = -1;
@@ -49,7 +45,7 @@ public class PlayerUtil {
     }
 
     public static boolean isUsingItem() {
-        return C.p().isUsingItem() || KillAura.isServerBlocking();
+        return C.p().isUsingItem() || KillAura.isServerBlocking() || com.github.cooldood.modules.impl.combat.Watchdog.isModuleBlocking();
     }
 
     @SubscribeEvent(priority = 9000)

@@ -142,43 +142,21 @@ public class KillAura extends Module {
     @RegisterSubModule(name = "AB Through Walls", parent = "Auto Block")
     public static boolean autoblockThroughWalls = true;
 
-    @RegisterSubModule(name = "Autoblock Mode", parent = "Auto Block", description = "bypahh")
+    @RegisterSubModule(name = "Autoblock Mode", parent = "Auto Block", description = "Combat autoblock mode")
     public static AutoBlockMode autoblockMode = AutoBlockMode.Watchdog;
 
     @RegisterSubModule(name = "Packet Block", parent = "Autoblock Mode", modeParentString = {"Vanilla", "Watchdog"})
     public static boolean packetBlock = false;
 
-    @RegisterSubModule(name = "Blink Mode", parent = "Autoblock Mode", modeParentString = "Watchdog")
-    public static Blink_Mode blinkMode = Blink_Mode.Hypixel;
+    @RegisterSubModule(name = "Watchdog Mode", parent = "Autoblock Mode", modeParentString = "Watchdog")
+    public static WatchdogLogicMode watchdogLogic = WatchdogLogicMode.Enemy_IFrame;
 
-    @RegisterSubModule(name = "Min Blink Ticks", min = 2, max = 6, parent = "Blink Mode", modeParentString = "Random")
-    public static int minBlinkTicks = 3;
-
-    @RegisterSubModule(name = "Max Blink Ticks", min = 2, max = 6, parent = "Blink Mode", modeParentString = "Random")
-    public static int maxBlinkTicks = 3;
-
-    @RegisterSubModule(name = "Blink Pre", parent = "Autoblock Mode", modeParentString = "Watchdog", dangerous = true)
-    public static boolean blinkPre = false;
-
-    @RegisterSubModule(name = "Legit Blink", description = "Unblocks randomly to look legit", parent = "Autoblock Mode", modeParentString = "Watchdog")
-    public static boolean legitBlink = true;
-    @RegisterSubModule(name = "Block Ratio", parent = "Legit Blink")
-    public static double blockRatio = 0.5;
-
-    @AllArgsConstructor
-    public enum Blink_Mode {
-        Hypixel(2),
-        Reduce(3),
-        Random(-1) {
-            @Override
-            public int getBlinkTicks() {
-                return (int) MathUtil.getRandomInRange(minBlinkTicks, maxBlinkTicks + 1);
-            }
-        };
-
-        @Getter
-        public final int blinkTicks;
+    public enum WatchdogLogicMode {
+        Enemy_IFrame, Smart, Player_IFrame
     }
+
+    @RegisterSubModule(name = "APS", min = 1.0, max = 20.0, increment = 1.0, parent = "Autoblock Mode", modeParentString = "Watchdog", description = "AutoBlocks Per Second (1 to 20 APS)")
+    public static double autoblockAPS = 15.0;
 
     public enum AutoBlockMode {
         Vanilla, Watchdog, Fake
@@ -190,6 +168,8 @@ public class KillAura extends Module {
     private static EntityLivingBase lastTarget = null;
     private static int switchTargetIndex = 0;
     private static RotationUtil.Rotation lastRotation = null;
+    private static long lastAutoblockCycleTime = 0;
+    private static boolean inAutoblockBurst = false;
 
     // ─── Auto Block state ─────────────────────────────────────────────────────
     @Getter private static boolean isBlocking, isServerBlocking = false;
@@ -197,11 +177,9 @@ public class KillAura extends Module {
     public static boolean clickBlockQueued = false;
 
     private static ItemStack itemInUse = null;
-    private static int blinkTick = 0;
-    private static int nextBlinkTicks = 2;
-    @Getter
-    private static boolean isBlinking = false;
     private static AutoBlockMode lastAutoblockMode;
+
+    // ─── Kill Aura events ─────────────────────────────────────────────────────
 
     // ─── Kill Aura events ─────────────────────────────────────────────────────
     @SubscribeEvent(priority = 999)
@@ -311,41 +289,54 @@ public class KillAura extends Module {
 
     public static void stopBlocking() {
         setBlocking(false, false);
-
-        if (isBlinking) {
-            blinkTick = 0;
-            isBlinking = false;
-            BlinkUtil.popBlink(true, false);
-        }
     }
 
     public static void tickBlocking() {
         if (autoblockMode == AutoBlockMode.Watchdog) {
-            boolean shouldBlock = !legitBlink || Math.random() <= blockRatio;
-            switch (blinkTick) {
-                case 0:
-                    if (!setBlocking(true, shouldBlock)) return;
-                    BlinkUtil.popBlink(true, false);
-
-                    if (blinkPre) {
-                        isBlinking = true;
-                        BlinkUtil.pushBlink(true, false);
-                    } else isBlinking = false;
-                    break;
-                case 1:
-                    if (!blinkPre) {
-                        isBlinking = true;
-                        BlinkUtil.pushBlink(true, false);
-                    }
-                    setBlocking(true, false);
-                    break;
+            List<EntityLivingBase> targets = TargetUtil.getPossibleTargets(autoblockRange, autoblockThroughWalls, true);
+            if (targets.isEmpty()) {
+                stopBlocking();
+                return;
             }
+            targets.sort(Comparator.comparingDouble(TargetUtil::getDistanceToEntity));
+            EntityLivingBase target = targets.get(0);
 
-            blinkTick++;
+            if (watchdogLogic == WatchdogLogicMode.Enemy_IFrame || watchdogLogic == WatchdogLogicMode.Smart) {
+                long now = System.currentTimeMillis();
+                double targetCycleMs = 1000.0 / Math.max(1.0, Math.min(20.0, autoblockAPS));
 
-            if (blinkTick > nextBlinkTicks) {
-                blinkTick = 0;
-                nextBlinkTicks = blinkMode.getBlinkTicks();
+                boolean enemyInIFrame = target.hurtResistantTime > 10 || target.hurtTime > 0;
+                boolean playerInIFrame = watchdogLogic == WatchdogLogicMode.Smart && (C.p().hurtTime > 0 || C.p().hurtResistantTime > 10);
+
+                if (enemyInIFrame || playerInIFrame) {
+                    // Enemy in damage immunity -> Sword block engaged
+                    setBlocking(true, true);
+                    inAutoblockBurst = false;
+                } else {
+                    // Enemy is damageable -> APS timed precision attack bursts
+                    boolean timePassed = (now - lastAutoblockCycleTime) >= targetCycleMs;
+                    if (timePassed) {
+                        lastAutoblockCycleTime = now;
+                        inAutoblockBurst = true;
+                        stopBlocking();
+                    } else if (inAutoblockBurst) {
+                        if (now - lastAutoblockCycleTime >= (targetCycleMs / 2.0)) {
+                            inAutoblockBurst = false;
+                            setBlocking(true, true);
+                        } else {
+                            stopBlocking();
+                        }
+                    } else {
+                        setBlocking(true, true);
+                    }
+                }
+            } else {
+                boolean playerIFrame = C.p().hurtTime > 0 || C.p().hurtResistantTime > 10;
+                if (playerIFrame) {
+                    setBlocking(true, true);
+                } else {
+                    stopBlocking();
+                }
             }
         } else {
             setBlocking(true, autoblockMode == AutoBlockMode.Vanilla);
@@ -478,9 +469,12 @@ public class KillAura extends Module {
     }
 
     private static boolean isTargetInFOV(EntityLivingBase entity) {
+        if (FOV >= 180) return true;
         Vec3 rotationPoint = TargetUtil.getTargetRotationPoint(entity, killAuraRotationRange, throughWalls, randomValidRotation);
         if (rotationPoint == null) return false;
-        return Math.abs(Math.abs(RotationUtil.getCurrentClientRotation().yaw) - Math.abs(RotationUtil.getRotation(rotationPoint).yaw)) % 180 <= FOV;
+        RotationUtil.Rotation rot = RotationUtil.getRotation(rotationPoint);
+        float yawDiff = Math.abs(RotationUtil.applyWrap360(RotationUtil.getCurrentClientRotation().yaw, rot.yaw) - RotationUtil.getCurrentClientRotation().yaw);
+        return yawDiff <= FOV;
     }
 
     private static RotationUtil.Rotation getRotation(EntityLivingBase entity) {

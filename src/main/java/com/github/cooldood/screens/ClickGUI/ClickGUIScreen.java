@@ -34,7 +34,7 @@ import java.util.List;
 public class ClickGUIScreen extends GuiScreen {
     // ─── Layout constants ─────────────────────────────────────────────────────
     public static final int fontSize = 10;
-    public static int GUI_TAB_WIDTH = 130;
+    public static int GUI_TAB_WIDTH = 160;
 
     // The virtual anchor — panels are translated to sit at this local origin.
     public static final int BASE_X = -GUI_TAB_WIDTH / 2;
