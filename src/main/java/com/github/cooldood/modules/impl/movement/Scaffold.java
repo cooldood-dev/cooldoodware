@@ -332,8 +332,14 @@ public class Scaffold extends Module {
                     && !manualJumpHeld) {
                 stage = 1;
             }
-            startY = (shouldKeepY && !manualJumpHeld) ? startY : MathHelper.floor_double(C.p().posY);
-            shouldKeepY = false;
+            if (isTellyPlus) {
+                if (manualJumpHeld || startY == 256) {
+                    startY = MathHelper.floor_double(C.p().posY);
+                }
+            } else {
+                startY = (shouldKeepY && !manualJumpHeld) ? startY : MathHelper.floor_double(C.p().posY);
+                shouldKeepY = false;
+            }
         } else if ((keepY == KeepYMode.Extra || keepY == KeepYMode.ExtraTelly || isTellyPlus) && stage > 0 && !manualJumpHeld) {
             int nextBlockY = MathHelper.floor_double(C.p().posY + C.p().motionY);
             if (nextBlockY <= startY && C.p().posY > (double) (startY + 1)) {
@@ -708,6 +714,9 @@ public class Scaffold extends Module {
             shouldScaffold = false;
             shouldTower = false;
             targetBlock = null;
+            startY = 256;
+            stage = 0;
+            shouldKeepY = false;
 
             if (previousStack != -1 && C.isInGame()) {
                 C.p().inventory.currentItem = previousStack;
