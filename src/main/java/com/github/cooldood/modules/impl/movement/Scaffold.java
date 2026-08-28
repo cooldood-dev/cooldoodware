@@ -146,23 +146,22 @@ public class Scaffold extends Module {
     @RegisterSubModule(name = "Rotate", parent = "Bypass", description = "Only places when looking at best target block")
     public static boolean rotate = true;
     @RegisterSubModule(name = "Rotation Mode", parent = "Rotate")
-    public static BridgingMode bridgingMode = BridgingMode.God;
+    public static BridgingMode bridgingMode = BridgingMode.Normal;
     @RegisterSubModule(name = "Only Place Best", parent = "Rotate", description = "Only places when looking at best target block")
     public static boolean onlyPlaceBest = true;
     @RegisterSubModule(name = "No Duplicate Rot", description = "Bypasses grims DuplicateRotPlace check", parent = "Rotate")
     public static boolean noDuplicateRot = true;
 
     public enum BridgingMode {
-        God,
+        Normal,
         Telly,
-        Derp,
-        Hypixel
+        Telly_Plus
     }
 
-    @RegisterSubModule(name = "Only When Jumping", description = "Only telly bridge if space held down", parent = "Rotation Mode", modeParentString = "Telly")
+    @RegisterSubModule(name = "Only When Jumping", description = "Only telly bridge if space held down", parent = "Rotation Mode", modeParentString = {"Telly", "Telly_Plus"})
     public static boolean spaceDownOnly = true;
 
-    @RegisterSubModule(name = "Telly Mode", description = "Ticks To Snap Back To Looking Forward After Landing", max = 5, parent = "Rotation Mode", modeParentString = "Telly")
+    @RegisterSubModule(name = "Telly Mode", description = "Ticks To Snap Back To Looking Forward After Landing", max = 5, parent = "Rotation Mode", modeParentString = {"Telly", "Telly_Plus"})
     public static Telly_Mode tellyMode = Telly_Mode.Hypixel;
     @AllArgsConstructor
     public enum Telly_Mode {
@@ -262,7 +261,6 @@ public class Scaffold extends Module {
     private static boolean didPlace = false;
     private static int lastPlaceStack = -1;
     private static boolean overridingSneak = false;
-    private static int hypixelRotationTick = 0;
 
     private static BlockTarget targetBlock = null;
 
@@ -317,6 +315,9 @@ public class Scaffold extends Module {
     public static void onPlayerUpdate(PlayerUpdateEvent event) {
         if (!shouldScaffold()) return;
 
+        boolean isTellyPlus = bridgingMode == BridgingMode.Telly_Plus;
+        boolean manualJumpHeld = C.mc.gameSettings.keyBindJump.isKeyDown();
+
         if (C.p().onGround) {
             if (stage > 0) {
                 stage--;
@@ -325,15 +326,15 @@ public class Scaffold extends Module {
                 stage++;
             }
             if (stage == 0
-                    && keepY != KeepYMode.None
+                    && (keepY != KeepYMode.None || isTellyPlus)
                     && (!keepYonPress || PlayerUtil.isUsingItem())
                     && (!disableWhileJumpActive || !C.p().isPotionActive(net.minecraft.potion.Potion.jump))
-                    && !C.mc.gameSettings.keyBindJump.isKeyDown()) {
+                    && !manualJumpHeld) {
                 stage = 1;
             }
-            startY = shouldKeepY ? startY : MathHelper.floor_double(C.p().posY);
+            startY = (shouldKeepY && !manualJumpHeld) ? startY : MathHelper.floor_double(C.p().posY);
             shouldKeepY = false;
-        } else if ((keepY == KeepYMode.Extra || keepY == KeepYMode.ExtraTelly) && stage > 0) {
+        } else if ((keepY == KeepYMode.Extra || keepY == KeepYMode.ExtraTelly || isTellyPlus) && stage > 0 && !manualJumpHeld) {
             int nextBlockY = MathHelper.floor_double(C.p().posY + C.p().motionY);
             if (nextBlockY <= startY && C.p().posY > (double) (startY + 1)) {
                 shouldKeepY = true;
@@ -361,12 +362,6 @@ public class Scaffold extends Module {
             }
         }
 
-
-        if (bridgingMode == BridgingMode.Hypixel && tryPlace) {
-            hypixelRotationTick++;
-        } else {
-            hypixelRotationTick = 0;
-        }
 
         if (!tryPlace) return;
 
@@ -409,6 +404,15 @@ public class Scaffold extends Module {
         }
     }
 
+    private static boolean shouldTellyJump(boolean jumpDown) {
+        if (bridgingMode == BridgingMode.Telly_Plus) {
+            return MovementUtil.groundTicks >= 1;
+        }
+        return (tellyBlockPlaced && tellyForwardTicksCount >= tellyMode.getTellyForwardTicks())
+                || (jumpDown && !lastJump)
+                || tellyMode.getTellyForwardTicks() == 0;
+    }
+
     private static boolean shouldScaffold() {
         return (!crouchDownOnly || Keyboard.isKeyDown(C.mc.gameSettings.keyBindSneak.getKeyCode()))
                 && (!rightClickOnly || C.mc.gameSettings.keyBindUseItem.isKeyDown())
@@ -417,7 +421,7 @@ public class Scaffold extends Module {
     }
 
     private static boolean shouldTelly() {
-        return rotate && bridgingMode == BridgingMode.Telly && (!spaceDownOnly || C.mc.gameSettings.keyBindJump.isKeyDown());
+        return rotate && (bridgingMode == BridgingMode.Telly_Plus || (bridgingMode == BridgingMode.Telly && (!spaceDownOnly || C.mc.gameSettings.keyBindJump.isKeyDown())));
     }
 
     private static boolean shouldPlaceBlock() {
@@ -426,7 +430,7 @@ public class Scaffold extends Module {
     }
 
     private static boolean shouldRotate() {
-        return rotate && (bridgingMode != BridgingMode.Derp || shouldPlaceBlock());
+        return rotate && (bridgingMode != BridgingMode.Normal || shouldPlaceBlock());
     }
 
     // 1 second time travel hack
@@ -493,11 +497,6 @@ public class Scaffold extends Module {
         }
     }
 
-    private static boolean shouldTellyJump(boolean jumpDown) {
-        return (tellyBlockPlaced && tellyForwardTicksCount >= tellyMode.getTellyForwardTicks())
-                || (jumpDown && !lastJump)
-                || tellyMode.getTellyForwardTicks() == 0;
-    }
 
     private static boolean shouldTower = false;
 
@@ -506,6 +505,9 @@ public class Scaffold extends Module {
     private static boolean shouldKeepY = false;
 
     private static boolean shouldKeepY() {
+        if (bridgingMode == BridgingMode.Telly_Plus) {
+            return !C.mc.gameSettings.keyBindJump.isKeyDown() && stage > 0;
+        }
         return keepY != KeepYMode.None && stage > 0;
     }
 
@@ -598,6 +600,11 @@ public class Scaffold extends Module {
     //  use the same sorta thing as killaura rotations, this is an fps killer.
     // maybe doing the block searching in here would be smarter but idk
     private static void rotate(Vec3 playerPosition, BlockTarget blockTarget, RotationEvent event) {
+        if (bridgingMode == BridgingMode.Telly_Plus && MovementUtil.groundTicks == 1) {
+            event.rotation = new RotationUtil.Rotation(PlayerUtil.lastRotation().pitch, C.p().rotationYaw);
+            return;
+        }
+
         MovingObjectPosition blockHitResult = WorldUtil.rayTrace(blockReach, playerPosition, PlayerUtil.lastRotation());
 
         BlockPos currentBlock = blockHitResult.getBlockPos().offset(blockHitResult.sideHit);
@@ -656,22 +663,6 @@ public class Scaffold extends Module {
                 if (shouldSmoothRotate()) {
                     event.rotation = RotationUtil.getEasedRotation(PlayerUtil.lastRotation(), bestRotation, tellyMode.getEasingFunction(), getRotationLerp());
                 }
-                else if (bridgingMode == BridgingMode.Hypixel) {
-                    float yawSpeed = hypixelRotationTick >= 2
-                            ? 75.0F + (float)Math.random() * 15.0F
-                            : 32.0F + (float)Math.random() * 13.0F;
-                    float pitchSpeed = hypixelRotationTick >= 2
-                            ? 35.0F + (float)Math.random() * 10.0F
-                            : 17.0F + (float)Math.random() * 10.0F;
-                    float yawDelta = net.minecraft.util.MathHelper.wrapAngleTo180_float(bestRotation.yaw - PlayerUtil.lastRotation().yaw);
-                    float pitchDelta = net.minecraft.util.MathHelper.clamp_float(bestRotation.pitch - PlayerUtil.lastRotation().pitch, -90.0F, 90.0F);
-                    float clampedYaw = Math.max(-yawSpeed, Math.min(yawSpeed, yawDelta));
-                    float clampedPitch = Math.max(-pitchSpeed, Math.min(pitchSpeed, pitchDelta));
-                    event.rotation = new RotationUtil.Rotation(
-                        net.minecraft.util.MathHelper.clamp_float(PlayerUtil.lastRotation().pitch + clampedPitch, -90.0F, 90.0F),
-                        PlayerUtil.lastRotation().yaw + clampedYaw
-                    );
-                }
                 else {
                     event.rotation = bestRotation;
                 }
@@ -680,13 +671,14 @@ public class Scaffold extends Module {
             }
         }
 
-        if (bridgingMode != BridgingMode.Derp) {
+        if (bridgingMode != BridgingMode.Normal) {
             event.rotation = PlayerUtil.lastRotation();
         }
     }
 
     private static boolean shouldSmoothRotate() {
         return shouldTelly()
+                && bridgingMode != BridgingMode.Telly_Plus
                 && tellyPlaceDelayCounter <= tellyMode.getRotationTicks()
                 && tellyMode.isSmoothRotationTelly();
     }

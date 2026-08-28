@@ -23,8 +23,16 @@ public class IconFont {
     public static final String CLOCK = "\uF017";
     public static final String CALENDAR = "\uF073";
     public static final String HEART = "\uF004";
+    public static final String CHART_BAR = "\uF080";
+    public static final String CHEVRON_UP = "\uF35B";
+    public static final String PLAY_CIRCLE = "\uF144";
+    public static final String TROPHY_FLAG = "\uF024";
+    public static final String TARGET_CIRCLE = "\uF192";
+    public static final String CROSS_CLOSE = "\uF410";
+    public static final String STAR = "\uF005";
+    public static final String COMPASS = "\uF14E";
 
-    private static final String GLYPHS = CLOCK + CALENDAR + HEART;
+    private static final String GLYPHS = CLOCK + CALENDAR + HEART + CHART_BAR + CHEVRON_UP + PLAY_CIRCLE + TROPHY_FLAG + TARGET_CIRCLE + CROSS_CLOSE + STAR + COMPASS;
     private static final int X_SPACING = 8;
 
     private static final Graphics2D DUMMY_GRAPHICS = setAntiAliasing(new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB).createGraphics());

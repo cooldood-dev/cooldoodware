@@ -6,6 +6,7 @@ import com.github.cooldood.events.impl.MotionEvent;
 import com.github.cooldood.events.impl.PacketEvent;
 import com.github.cooldood.modules.*;
 import com.github.cooldood.modules.impl.client.ThemeModule;
+import com.github.cooldood.modules.impl.movement.Scaffold;
 import com.github.cooldood.utils.client.C;
 import com.github.cooldood.utils.minecraft.TimerUtil;
 import com.github.cooldood.utils.render.FontUtil;
@@ -46,6 +47,10 @@ public class Statistics extends Module {
     public static boolean motionGraph = true;
     @RegisterSubModule(name = "Separate Graph")
     public static boolean seprateMotionGraph = true;
+    @RegisterSubModule(name = "Show BPS Counter")
+    public static boolean showBps = true;
+    @RegisterSubModule(name = "Separate BPS")
+    public static boolean separateBps = true;
     @RegisterSubModule(name = "Size", min = 0.5, max = 2.0, increment = 0.05)
     public static double scale = 1.0;
 
@@ -94,6 +99,13 @@ public class Statistics extends Module {
             "motionGraph",
             Statistics::renderMotionGraph,
             e -> ModuleManager.isEnabled(Statistics.class) && motionGraph && seprateMotionGraph,
+            e -> true
+    );
+
+    public static Draggable bpsDragging = new Draggable(
+            "bpsCounter",
+            Statistics::renderBpsCounter,
+            e -> ModuleManager.isEnabled(Statistics.class) && showBps && separateBps,
             e -> true
     );
 
@@ -161,10 +173,14 @@ public class Statistics extends Module {
         // 1. HEADER
         float headerIconY = curY + (FontUtil.getFontHeight(SZ_TITLE) - ICON_SZ) / 2f;
         drawIconSquare(PAD_X, headerIconY, ac);
-        // ASCII line chart/grid icon
-        FontUtil.drawString("~", PAD_X + (ICON_SZ - FontUtil.getStringWidth("~", SZ_ICON)) / 2f,
-                headerIconY + (ICON_SZ - FontUtil.getFontHeight(SZ_ICON)) / 2f,
-                SZ_ICON, ac, false);
+        
+        // Font Awesome chart-bar icon
+        float chartW = IconFont.getWidth(IconFont.CHART_BAR, SZ_ICON);
+        float chartH = IconFont.getHeight(SZ_ICON);
+        IconFont.drawIcon(IconFont.CHART_BAR,
+                PAD_X + (ICON_SZ - chartW) / 2f,
+                headerIconY + (ICON_SZ - chartH) / 2f,
+                SZ_ICON, ac);
                 
         float titleX = PAD_X + ICON_SZ + 6;
         float titleY = curY + (Math.max(ICON_SZ, FontUtil.getFontHeight(SZ_TITLE)) - FontUtil.getFontHeight(SZ_TITLE)) / 2f;
@@ -173,9 +189,13 @@ public class Statistics extends Module {
         float sessionW = FontUtil.getStringWidth("SESSION ", SZ_TITLE);
         FontUtil.drawString("STATS", titleX + sessionW, titleY, SZ_TITLE, ac, false);
         
-        // Tiny Chevron
-        String chevron = "^";
-        FontUtil.drawString(chevron, width - PAD_X - FontUtil.getStringWidth(chevron, SZ_TITLE), titleY, SZ_TITLE, textGray, false);
+        // Font Awesome chevron up icon
+        float chevW = IconFont.getWidth(IconFont.CHEVRON_UP, SZ_ICON);
+        float chevH = IconFont.getHeight(SZ_ICON);
+        IconFont.drawIcon(IconFont.CHEVRON_UP,
+                width - PAD_X - chevW,
+                headerIconY + (ICON_SZ - chevH) / 2f,
+                SZ_ICON, textGray);
         
         curY += Math.max(ICON_SZ, FontUtil.getFontHeight(SZ_TITLE)) + 6f;
         
@@ -184,8 +204,6 @@ public class Statistics extends Module {
         curY += 1f + 6f;
         
         // 3. STATS ROWS
-        String[] rowIcons   = { "v", "v", "v", "x" }; // generic simple icons
-        int ri = 0;
         for (Map.Entry<String, Double> entry : statistics.entrySet()) {
             String label = entry.getKey();
             boolean isKD = label.equals("K/D");
@@ -197,11 +215,32 @@ public class Statistics extends Module {
             float iconY = rowCY - ICON_SZ / 2f;
             
             drawIconSquare(PAD_X, iconY, ac);
-            String glyph = ri < rowIcons.length ? rowIcons[ri] : "?";
-            FontUtil.drawString(glyph,
-                    PAD_X + (ICON_SZ - FontUtil.getStringWidth(glyph, SZ_ICON)) / 2f,
-                    iconY + (ICON_SZ - FontUtil.getFontHeight(SZ_ICON)) / 2f,
-                    SZ_ICON, ac, false);
+            
+            String iconGlyph;
+            switch (label) {
+                case "Games Played":
+                    iconGlyph = IconFont.PLAY_CIRCLE;
+                    break;
+                case "Victories":
+                    iconGlyph = IconFont.TROPHY_FLAG;
+                    break;
+                case "K/D":
+                    iconGlyph = IconFont.CROSS_CLOSE;
+                    break;
+                case "Kills":
+                    iconGlyph = IconFont.TARGET_CIRCLE;
+                    break;
+                default:
+                    iconGlyph = IconFont.STAR;
+                    break;
+            }
+
+            float rowIconW = IconFont.getWidth(iconGlyph, SZ_ICON);
+            float rowIconH = IconFont.getHeight(SZ_ICON);
+            IconFont.drawIcon(iconGlyph,
+                    PAD_X + (ICON_SZ - rowIconW) / 2f,
+                    iconY + (ICON_SZ - rowIconH) / 2f,
+                    SZ_ICON, ac);
                     
             float labelY = rowCY - FontUtil.getFontHeight(SZ_LABEL) / 2f;
             FontUtil.drawString(label, PAD_X + ICON_SZ + 6, labelY, SZ_LABEL, textGray, false);
@@ -211,7 +250,6 @@ public class Statistics extends Module {
             FontUtil.drawString(value, width - PAD_X - valW, labelY, SZ_VALUE, valColor, false);
             
             curY += ROW_H;
-            ri++;
         }
         
         // 4. PLAY TIME SEPARATOR
@@ -289,6 +327,43 @@ public class Statistics extends Module {
         return new double[]{width * scale, height * scale};
     }
 
+    // ── BPS Counter (separate draggable / card) ───────────────────────────
+    private static double[] renderBpsCounter() {
+        GL11.glPushMatrix();
+        GL11.glScalef((float) scale, (float) scale, 1f);
+
+        Color ac = accent();
+        Color bg = new Color(22, 22, 26, 220); // Dark translucent charcoal
+        Color textWhite = new Color(240, 240, 240);
+        Color textGray = new Color(170, 170, 170);
+
+        float cardW = 120f;
+        float cardH = 34f;
+
+        RenderUtil.drawRoundedRect(0, 0, cardW, cardH, CORNER_RAD, bg);
+        RenderUtil.drawRoundedRectOutline(0, 0, cardW, cardH, CORNER_RAD, 0.5f, new Color(255, 255, 255, 10));
+
+        float midY = cardH / 2f;
+        drawIconSquare(PAD_X, midY - ICON_SZ / 2f, ac);
+
+        float iconW = IconFont.getWidth(IconFont.COMPASS, SZ_ICON);
+        float iconH = IconFont.getHeight(SZ_ICON);
+        IconFont.drawIcon(IconFont.COMPASS,
+                PAD_X + (ICON_SZ - iconW) / 2f,
+                midY - iconH / 2f,
+                SZ_ICON, ac);
+
+        float textY = midY - FontUtil.getFontHeight(SZ_LABEL) / 2f;
+        FontUtil.drawString("BPS", PAD_X + ICON_SZ + 6, textY, SZ_LABEL, textGray, false);
+
+        String bpsVal = String.valueOf(getCurrentSpeed());
+        float bpsValW = FontUtil.getStringWidth(bpsVal, SZ_VALUE);
+        FontUtil.drawString(bpsVal, cardW - PAD_X - bpsValW, textY, SZ_VALUE, textWhite, false);
+
+        GL11.glPopMatrix();
+        return new double[]{cardW * scale, cardH * scale};
+    }
+
     // ── Speed plot (unchanged logic) ──────────────────────────────────────
     private static void drawSpeedPlot(float x, float y, float w, float h, Color accent) {
         RenderUtil.drawRoundedRect(x, y, w, h, 6, new Color(15, 15, 20, 180));
@@ -313,6 +388,12 @@ public class Statistics extends Module {
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────
+    private static double getCurrentSpeed() {
+        if (C.p() == null) return 0.0;
+        double bps = (Math.hypot(C.p().posX - C.p().prevPosX,
+                C.p().posZ - C.p().prevPosZ) * TimerUtil.getTimer()) * 20;
+        return Math.round(bps * 100) / 100.0;
+    }
     private static double getAverageSpeed() {
         double average = speeds.stream().collect(Collectors.averagingDouble(value -> value.doubleValue() * 50));
         return Math.round(average * 100) / 100.0;
