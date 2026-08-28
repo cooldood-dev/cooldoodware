@@ -66,6 +66,9 @@ public class Scaffold extends Module {
     @RegisterSubModule(name = "Swap Time", parent = "Use Largest Stack", description = "Blocks places between switching blocks", min = 1, max = 10)
     public static int swapTime = 5;
 
+    @RegisterSubModule(name = "Same Y", parent = "Basics", description = "Maintains the same Y level unless jumping and right clicking")
+    public static boolean sameY = false;
+
     @RegisterSubModule(name = "Tower")
     public static SubCategory towerCategory = new SubCategory();
 
@@ -386,10 +389,20 @@ public class Scaffold extends Module {
         }
     }
 
+    private static boolean isSameYBlocking(EnumFacing sideHit) {
+        if (!sameY) return false;
+        if (sideHit != EnumFacing.UP) return false;
+        // Exception: Holding Jump AND Right Click allows UP placement (tower)
+        boolean jumpHeld = C.mc.gameSettings.keyBindJump.isKeyDown();
+        boolean rightClickHeld = C.mc.gameSettings.keyBindUseItem.isKeyDown();
+        return !(jumpHeld && rightClickHeld);
+    }
+
     private static void tryPlace() {
         MovingObjectPosition rayTrace = WorldUtil.rayTrace(blockReach, PlayerUtil.currentRotation());
 
         if (rayTrace == null || rayTrace.typeOfHit != MovingObjectPosition.MovingObjectType.BLOCK) return;
+        if (isSameYBlocking(rayTrace.sideHit)) return;
         if (rotate && onlyPlaceBest && (targetBlock == null || !rayTrace.getBlockPos().offset(rayTrace.sideHit).equals(targetBlock.pos.offset(targetBlock.direction)))) return;
         if (!rotate && shouldKeepY() && rayTrace.sideHit == EnumFacing.UP) return;
         if (rayTrace.getBlockPos().offset(rayTrace.sideHit).getY() > C.p().posY) return;
@@ -583,7 +596,7 @@ public class Scaffold extends Module {
 
                 // obviously placing a block above you isnt helpful.
                 if (facing == EnumFacing.DOWN) continue;
-                if (facing == EnumFacing.UP && shouldKeepY()) continue;
+                if (facing == EnumFacing.UP && (shouldKeepY() || isSameYBlocking(facing))) continue;
 
                 if (InventoryUtil.isSolidBlock(C.w().getBlockState(blockPosOffset).getBlock())) continue;
                 if (blockPosOffset.getY() + 1 > C.p().posY) continue;
@@ -651,7 +664,7 @@ public class Scaffold extends Module {
                     if (raycast == null) continue;
                     BlockPos raycastBlock = raycast.getBlockPos().offset(raycast.sideHit);
 
-                    if (raycastBlock.equals(targetBlock) && (!shouldKeepY() || raycast.sideHit != EnumFacing.UP)) {
+                    if (raycastBlock.equals(targetBlock) && (!shouldKeepY() || raycast.sideHit != EnumFacing.UP) && !isSameYBlocking(raycast.sideHit)) {
                         float bestRotationChange = Math.abs(PlayerUtil.lastRotation().pitch - closestPitch) + Math.abs(closestYaw);
                         float currentRotationChange = Math.abs(PlayerUtil.lastRotation().pitch - gcdedRotation.pitch) + Math.abs(yawChange);
                         if (currentRotationChange < bestRotationChange) {
