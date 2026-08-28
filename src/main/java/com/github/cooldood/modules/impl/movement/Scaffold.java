@@ -335,6 +335,14 @@ public class Scaffold extends Module {
                     && !manualJumpHeld) {
                 stage = 1;
             }
+            if (isTellyKeepYActive()) {
+                if (manualJumpHeld || tellyKeepY == 256) {
+                    tellyKeepY = MathHelper.floor_double(C.p().posY);
+                }
+            } else {
+                tellyKeepY = 256;
+            }
+
             if (isTellyPlus) {
                 if (manualJumpHeld || startY == 256) {
                     startY = MathHelper.floor_double(C.p().posY);
@@ -522,6 +530,11 @@ public class Scaffold extends Module {
     private static int stage = 0;
     private static int startY = 256;
     private static boolean shouldKeepY = false;
+    private static int tellyKeepY = 256;
+
+    private static boolean isTellyKeepYActive() {
+        return shouldTelly() && (keepY != KeepYMode.None || bridgingMode == BridgingMode.Telly_Plus);
+    }
 
     private static boolean shouldKeepY() {
         if (bridgingMode == BridgingMode.Telly_Plus) {
@@ -576,7 +589,12 @@ public class Scaffold extends Module {
 
     private static BlockTarget getBestTargetBlock(Vec3 position) {
         int playerY = MathHelper.floor_double(C.p().posY);
-        int targetY = (stage != 0 && !shouldKeepY ? Math.min(playerY, startY) : playerY);
+        int targetY;
+        if (isTellyKeepYActive() && tellyKeepY != 256) {
+            targetY = tellyKeepY;
+        } else {
+            targetY = (stage != 0 && !shouldKeepY ? Math.min(playerY, startY) : playerY);
+        }
         BlockPos blockPosition = new BlockPos(position.xCoord, targetY, position.zCoord);
         BlockPos point1 = blockPosition.add(-blockReach, -blockReach, -blockReach);
         BlockPos point2 = blockPosition.add(blockReach, -1, blockReach);
@@ -730,6 +748,7 @@ public class Scaffold extends Module {
             startY = 256;
             stage = 0;
             shouldKeepY = false;
+            tellyKeepY = 256;
 
             if (previousStack != -1 && C.isInGame()) {
                 C.p().inventory.currentItem = previousStack;
