@@ -620,6 +620,23 @@ public abstract class ItemRendererMixin {
         return false;
     }
 
+    @Redirect(
+            method = "renderItemInFirstPerson",
+            at = @At(value = "INVOKE",
+                    target = "Lnet/minecraft/client/renderer/ItemRenderer;" +
+                            "renderItem(Lnet/minecraft/entity/EntityLivingBase;" +
+                            "Lnet/minecraft/item/ItemStack;" +
+                            "Lnet/minecraft/client/renderer/block/model/ItemCameraTransforms$TransformType;)V")
+    )
+    public void redirectRenderItemInFirstPerson(ItemRenderer instance, EntityLivingBase entityIn, ItemStack itemStackIn, ItemCameraTransforms.TransformType transformType) {
+        ItemStack spoofed = com.github.cooldood.modules.impl.movement.Scaffold.getSpoofedStack();
+        if (spoofed != null) {
+            instance.renderItem(entityIn, spoofed, transformType);
+        } else {
+            instance.renderItem(entityIn, itemStackIn, transformType);
+        }
+    }
+
     @Inject(
             method = "renderItemInFirstPerson",
             at = @At(value = "INVOKE",

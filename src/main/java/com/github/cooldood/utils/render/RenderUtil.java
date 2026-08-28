@@ -570,6 +570,7 @@ public class RenderUtil {
         }
 
         finishRender();
+        GlStateManager.colorMask(true, true, true, true);
         // Do not delete texture! It's cached now for performance.
     }
 

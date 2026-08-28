@@ -131,8 +131,8 @@ public class Scaffold extends Module {
     @RegisterSubModule(name = "Fade Time", parent = "Show Previous Blocks", min = 50, max = 10000, increment = 50)
     public static long showPreviousBlocksTime = 3000;
 
-    @RegisterSubModule(name = "Item Spoof", description = "Visually renders the item you were originally holding while placing blocks", parent = "Visuals")
-    public static boolean itemSpoof = true;
+    @RegisterSubModule(name = "Item Spoof", description = "Shows the block being placed in your hand", parent = "Visuals")
+    public static boolean itemSpoof = false;
 
     @RegisterSubModule(name = "Bypass")
     public static SubCategory bypass = new SubCategory();
@@ -760,14 +760,6 @@ public class Scaffold extends Module {
             overridingSneak = false;
             KeyBindingBridge.from(C.mc.gameSettings.keyBindSneak).bridge$setDown(Keyboard.isKeyDown(C.mc.gameSettings.keyBindSneak.getKeyCode()));
         }
-    }
-
-    public static net.minecraft.item.ItemStack getSpoofedStack() {
-        if (!shouldScaffold || !itemSpoof || previousStack == -1 || C.p() == null) return null;
-        if (previousStack >= 0 && previousStack < C.p().inventory.mainInventory.length) {
-            return C.p().inventory.mainInventory[previousStack];
-        }
-        return null;
     }
 
     @Override
