@@ -13,6 +13,7 @@ import com.github.cooldood.utils.alts.microsoft.Cookies;
 import com.github.cooldood.utils.alts.microsoft.MSAuth;
 import com.github.cooldood.utils.alts.microsoft.RefreshTokenAuth;
 import com.github.cooldood.utils.client.C;
+import com.github.cooldood.utils.client.FileChooserUtil;
 import com.github.cooldood.utils.client.FrameUtil;
 import com.github.cooldood.utils.client.NetworkUtil;
 import com.github.cooldood.utils.minecraft.ChatUtil;
@@ -61,25 +62,45 @@ public class Login {
                 setErrorMessage("Invalid clipboard data, please copy a session ID to clipboard!");
             }
         }),
-        Cookie("Cookie", "§a", "gets cookie files/file path from clipboard", () -> {
+        Cookie("Cookie", "§a", "picks cookie file or reads clipboard", () -> {
             Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
-
+            boolean handled = false;
             try {
-                // "Unchecked cast: 'java.lang.Object' to 'java.util.List<java.io.File>'" thats what the try-catch is for :sunglasses:
-                java.util.List<File> data = (List<File>) clipboard.getData(DataFlavor.javaFileListFlavor);
-
-                for (File file : data) Login.loginCookie(file);
-            } catch (Exception e) {
-                System.err.println("Assuming clipboard isn't a file, trying as string");
-
-                // try-catch stacking, god programmer
-                try {
-                    String filePath = ((String) clipboard.getData(DataFlavor.stringFlavor)).replaceAll("\"", "").trim();
-                    Login.loginCookie(new File(filePath));
-                } catch (Exception ex) {
-                    FrameUtil.createCookiesFrame();
-                    setErrorMessage("Opened window to drop cookies file on");
+                if (clipboard.isDataFlavorAvailable(DataFlavor.javaFileListFlavor)) {
+                    java.util.List<File> data = (List<File>) clipboard.getData(DataFlavor.javaFileListFlavor);
+                    if (data != null && !data.isEmpty()) {
+                        for (File file : data) Login.loginCookie(file);
+                        handled = true;
+                    }
                 }
+            } catch (Exception ignored) {}
+
+            if (!handled) {
+                try {
+                    if (clipboard.isDataFlavorAvailable(DataFlavor.stringFlavor)) {
+                        String str = ((String) clipboard.getData(DataFlavor.stringFlavor)).replaceAll("\"", "").trim();
+                        File potentialFile = new File(str);
+                        if (potentialFile.exists() && potentialFile.isFile()) {
+                            Login.loginCookie(potentialFile);
+                            handled = true;
+                        } else if (str.contains("=") || str.contains("\t") || str.length() > 50) {
+                            Login.loginCookie(str);
+                            handled = true;
+                        }
+                    }
+                } catch (Exception ignored) {}
+            }
+
+            if (!handled) {
+                FileChooserUtil.openFilePicker("Select Cookie File", file -> {
+                    if (file != null) {
+                        try {
+                            Login.loginCookie(file);
+                        } catch (Exception e) {
+                            Login.setErrorMessage("Failed to read cookie file: " + e.getMessage());
+                        }
+                    }
+                });
             }
         }),
         Microsoft("Microsoft", "§2", "opens microsoft oauth link in browser", Login::loginMicrosoft),

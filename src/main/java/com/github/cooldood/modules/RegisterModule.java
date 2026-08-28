@@ -11,4 +11,5 @@ public @interface RegisterModule {
 
     boolean enabledByDefault() default false;
     boolean dangerous() default false;
+    int keybind() default -1;
 }

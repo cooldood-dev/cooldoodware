@@ -135,5 +135,5 @@ public class ArrayListModule extends Module {
     protected void onEnable() {}
     @Override
     protected void onDisable() {}
-    static { arraylistDraggable.anchor = Draggable.Anchor.RIGHT; arraylistDraggable.x = 0.99; arraylistDraggable.y = 0.05; }
+    static { arraylistDraggable.anchor = Draggable.Anchor.RIGHT; arraylistDraggable.x = 0.99; arraylistDraggable.y = 0.01; }
 }

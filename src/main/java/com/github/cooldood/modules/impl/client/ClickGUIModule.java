@@ -6,12 +6,14 @@ import com.github.cooldood.modules.*;
 import com.github.cooldood.screens.ClickGUI.ClickGUIScreen;
 import com.github.cooldood.utils.client.C;
 import com.github.cooldood.utils.client.ScreenUtil;
+import org.lwjgl.input.Keyboard;
 import com.github.cooldood.utils.render.EasingUtil;
 
 @RegisterModule(
         name = "Click GUI",
         description = "Provides Click GUI functionality for the client.",
-        category = Category.CLIENT
+        category = Category.CLIENT,
+        keybind = Keyboard.KEY_RSHIFT
 )
 public class ClickGUIModule extends Module {
     @RegisterSubModule(name = "Fancy Dragging")

@@ -16,25 +16,10 @@ public class FrameUtil {
     // this probably has 99 problems and they are NOT all bitches. <- kid cudi reference, not jay z
     // but i want to drag and drop files.
     public static void createCookiesFrame() {
-        JFrame frame = new JFrame("Drop Cookies Files Here");
-        frame.setSize(400, 400);
-        frame.setLocationRelativeTo(null);
-
-        frame.setDropTarget(new DropTarget() {
-            @Override
-            public void drop(DropTargetDropEvent dtde) {
-                try {
-                    dtde.acceptDrop(DnDConstants.ACTION_COPY);
-                    List<File> droppedFiles = (List<File>) dtde.getTransferable().getTransferData(DataFlavor.javaFileListFlavor);
-                    Bus.post(new FileDroppedEvent(droppedFiles));
-                    dtde.dropComplete(true);
-                } catch (Exception e) {
-                    System.err.println("Failed to handle file drop: " + e.getMessage());
-                    e.printStackTrace();
-                }
+        FileChooserUtil.openFilePicker("Select Cookie File", file -> {
+            if (file != null) {
+                Bus.post(new FileDroppedEvent(java.util.Collections.singletonList(file)));
             }
         });
-
-        frame.setVisible(true);
     }
 }

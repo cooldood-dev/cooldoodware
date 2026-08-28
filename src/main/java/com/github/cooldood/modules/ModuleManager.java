@@ -70,6 +70,9 @@ public class ModuleManager {
                 m.getChildren().add(holdKeybind);
 
                 m.setAnnotation(annotation);
+                if (annotation.keybind() != -1) {
+                    KeybindHandler.registerKeybind(m, annotation.keybind());
+                }
                 modules.put(moduleClazz, m);
                 m.setEnabled(annotation.enabledByDefault());
             } catch (Exception e) {
@@ -230,12 +233,21 @@ public class ModuleManager {
         if (!modulesJSON.containsKey(module.getAnnotation().name())) {
             Main.LOGGER.warn("Module config missing: {}. Defaulting to {}", module.getAnnotation().name(), module.getAnnotation().enabledByDefault());
             module.setEnabled(module.getAnnotation().enabledByDefault());
+            if (module.getAnnotation().keybind() != -1) {
+                KeybindHandler.registerKeybind(module, module.getAnnotation().keybind());
+            }
         }
         else {
             LinkedTreeMap<String, Object> subModules = modulesJSON.get(module.getAnnotation().name());
             module.setEnabled(subModules.get("enabled").equals(true));
             // it thinks -1 is a double :(
-            int keybind = (int) Double.parseDouble(subModules.get("keybind").toString());
+            int keybind = -1;
+            if (subModules.containsKey("keybind")) {
+                keybind = (int) Double.parseDouble(subModules.get("keybind").toString());
+            }
+            if (keybind == -1 && module.getAnnotation().keybind() != -1) {
+                keybind = module.getAnnotation().keybind();
+            }
             if (keybind != -1)
                 KeybindHandler.registerKeybind(module, keybind);
             else
